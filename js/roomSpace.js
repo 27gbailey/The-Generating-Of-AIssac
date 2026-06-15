@@ -1,7 +1,5 @@
 import {
   DOOR_WALLS,
-  ROCK_HITBOX_INSET,
-  ROCK_HITBOX_RADIUS,
   ROOM_HEIGHT,
   ROOM_WIDTH,
   TILE,
@@ -12,6 +10,7 @@ import { isInDoorGap } from "./doors.js";
 import { isBarrelSolid, barrelHitbox } from "./barrel.js";
 import { isRockSolid } from "./destructibles.js";
 import { findPoopHit, isPoopSolid, poopHitbox } from "./poop.js";
+import { circleIntersectsObjectHitbox, objectHitbox } from "./objectHitbox.js";
 
 export function getPlayAreaSize() {
   return {
@@ -51,14 +50,7 @@ function isSolidTile(code, room, tx, ty) {
 }
 
 function rockHitbox(tx, ty) {
-  const inset = ROCK_HITBOX_INSET;
-  return {
-    left: tx * TILE_SIZE + inset,
-    top: ty * TILE_SIZE + inset,
-    width: TILE_SIZE - inset * 2,
-    height: TILE_SIZE - inset * 2,
-    radius: ROCK_HITBOX_RADIUS,
-  };
+  return objectHitbox(tx, ty);
 }
 
 function circleIntersectsRoundedRect(cx, cy, radius, rect) {

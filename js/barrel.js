@@ -1,12 +1,16 @@
 import {
-  BARREL_HITBOX_INSET,
-  BARREL_HITBOX_RADIUS,
   BARREL_HITS_TO_DESTROY,
   ROOM_HEIGHT,
   ROOM_WIDTH,
   TILE,
   TILE_SIZE,
 } from "./constants.js";
+import {
+  circleIntersectsObjectHitbox,
+  traceObjectRect,
+} from "./objectHitbox.js";
+
+export { objectHitbox as barrelHitbox } from "./objectHitbox.js";
 
 function pointInExplosion(px, py, cx, cy, radiusX, radiusY) {
   const dx = (px - cx) / radiusX;
@@ -34,28 +38,6 @@ export function isBarrelSolid(room, tx, ty) {
   return !state?.destroyed;
 }
 
-export function barrelHitbox(tx, ty) {
-  const inset = BARREL_HITBOX_INSET;
-  return {
-    left: tx * TILE_SIZE + inset,
-    top: ty * TILE_SIZE + inset,
-    width: TILE_SIZE - inset * 2,
-    height: TILE_SIZE - inset * 2,
-    radius: BARREL_HITBOX_RADIUS,
-  };
-}
-
-function circleIntersectsRoundedRect(cx, cy, radius, rect) {
-  const centerX = rect.left + rect.width / 2;
-  const centerY = rect.top + rect.height / 2;
-  const halfW = rect.width / 2 - rect.radius;
-  const halfH = rect.height / 2 - rect.radius;
-  const localX = Math.abs(cx - centerX) - halfW;
-  const localY = Math.abs(cy - centerY) - halfH;
-  const outside = Math.hypot(Math.max(localX, 0), Math.max(localY, 0));
-  return outside - rect.radius <= radius;
-}
-
 export function findBarrelHit(cx, cy, radius, room) {
   const minTx = Math.max(0, Math.floor((cx - radius) / TILE_SIZE));
   const maxTx = Math.min(ROOM_WIDTH - 1, Math.floor((cx + radius) / TILE_SIZE));
@@ -65,7 +47,7 @@ export function findBarrelHit(cx, cy, radius, room) {
   for (let ty = minTy; ty <= maxTy; ty++) {
     for (let tx = minTx; tx <= maxTx; tx++) {
       if (!isBarrelSolid(room, tx, ty)) continue;
-      if (circleIntersectsRoundedRect(cx, cy, radius, barrelHitbox(tx, ty))) {
+      if (circleIntersectsObjectHitbox(cx, cy, radius, tx, ty)) {
         return { tx, ty, key: `${tx},${ty}` };
       }
     }
@@ -123,63 +105,65 @@ export function barrelDamageStage(hits, destroyed) {
 
 export function drawBarrel(ctx, px, py, hits, destroyed) {
   if (destroyed) {
-    ctx.fillStyle = "rgba(40, 25, 12, 0.25)";
-    ctx.fillRect(px + 8, py + 14, TILE_SIZE - 16, 12);
+    ctx.fillStyle = "rgba(40, 25, 12, 0.28)";
+    traceObjectRect(ctx, px, py);
+    ctx.fill();
     return;
   }
 
   const stage = barrelDamageStage(hits, destroyed);
-  const cx = px + TILE_SIZE * 0.5;
-  const cy = py + TILE_SIZE * 0.56;
-  const bulge = stage * 3;
-  const w = 28 + bulge;
-  const h = 22 + stage;
+  const bulge = stage * 1.5;
 
   ctx.save();
 
-  ctx.fillStyle = "#3a2510";
-  ctx.beginPath();
-  ctx.ellipse(cx, cy + 6, w * 0.52, h * 0.28, 0, 0, Math.PI * 2);
+  traceObjectRect(ctx, px, py);
+  ctx.fillStyle = "#2a1808";
   ctx.fill();
 
-  ctx.fillStyle = stage >= 2 ? "#6a4020" : stage >= 1 ? "#5a3818" : "#4a3015";
-  ctx.beginPath();
-  ctx.ellipse(cx, cy, w * 0.5, h * 0.46, 0, 0, Math.PI * 2);
+  const { x, y, w, h } = traceObjectRect(ctx, px + bulge * 0.25, py + bulge * 0.25);
+  const cx = x + w / 2;
+  const cy = y + h / 2;
+
+  const bodyGrad = ctx.createLinearGradient(x, y, x, y + h);
+  bodyGrad.addColorStop(0, stage >= 2 ? "#7a5030" : stage >= 1 ? "#6a4020" : "#5a3818");
+  bodyGrad.addColorStop(0.5, "#4a3015");
+  bodyGrad.addColorStop(1, "#3a2510");
+  ctx.fillStyle = bodyGrad;
+  traceObjectRect(ctx, px + bulge * 0.25, py + bulge * 0.25);
   ctx.fill();
 
   ctx.strokeStyle = "#2a1808";
   ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.ellipse(cx, cy, w * 0.5, h * 0.46, 0, 0, Math.PI * 2);
+  traceObjectRect(ctx, px + bulge * 0.25, py + bulge * 0.25);
   ctx.stroke();
 
-  ctx.strokeStyle = "#7a5030";
+  ctx.strokeStyle = "#8a6040";
   ctx.lineWidth = 2.5;
-  ctx.beginPath();
-  ctx.moveTo(px + 10 - bulge * 0.2, cy - 2);
-  ctx.lineTo(px + TILE_SIZE - 10 + bulge * 0.2, cy - 2);
-  ctx.moveTo(px + 10 - bulge * 0.15, cy + 5);
-  ctx.lineTo(px + TILE_SIZE - 10 + bulge * 0.15, cy + 5);
-  ctx.stroke();
+  for (const bandY of [cy - h * 0.18, cy + h * 0.12]) {
+    ctx.beginPath();
+    ctx.moveTo(x + w * 0.08, bandY);
+    ctx.lineTo(x + w * 0.92, bandY);
+    ctx.stroke();
+  }
 
-  ctx.fillStyle = "#8a1a12";
-  ctx.fillRect(cx - 5 - stage, cy - h * 0.55, 10 + stage * 2, 5);
+  ctx.fillStyle = stage >= 2 ? "#c02818" : "#8a1a12";
+  ctx.fillRect(cx - w * 0.16, y + 2, w * 0.32, h * 0.12);
 
   if (stage >= 1) {
-    ctx.strokeStyle = "rgba(20, 10, 5, 0.7)";
+    ctx.strokeStyle = "rgba(20, 10, 5, 0.75)";
     ctx.lineWidth = 1.5;
     ctx.beginPath();
-    ctx.moveTo(cx - w * 0.3, cy - 4);
-    ctx.lineTo(cx - w * 0.1, cy + 6);
-    ctx.moveTo(cx + w * 0.25, cy - 6);
-    ctx.lineTo(cx + w * 0.35, cy + 4);
+    ctx.moveTo(cx - w * 0.28, cy - h * 0.08);
+    ctx.lineTo(cx - w * 0.08, cy + h * 0.18);
+    ctx.moveTo(cx + w * 0.22, cy - h * 0.12);
+    ctx.lineTo(cx + w * 0.34, cy + h * 0.1);
     ctx.stroke();
   }
 
   if (stage >= 2) {
-    ctx.fillStyle = "rgba(255, 120, 40, 0.35)";
+    ctx.fillStyle = "rgba(255, 120, 40, 0.45)";
     ctx.beginPath();
-    ctx.arc(cx + w * 0.15, cy - 2, 4, 0, Math.PI * 2);
+    ctx.arc(cx + w * 0.12, cy - h * 0.04, w * 0.1, 0, Math.PI * 2);
     ctx.fill();
   }
 

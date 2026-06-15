@@ -22,14 +22,15 @@ export const DOOR_WALLS = ["north", "east", "south", "west"];
 export const TILE_SIZE = 64;
 export const WALL_THICKNESS = 28;
 
-/** Inset rock collision/visual hitbox from each tile edge (px). */
-export const ROCK_HITBOX_INSET = 3;
-/** Corner radius for rock hitboxes (px). */
-export const ROCK_HITBOX_RADIUS = 5;
+/** Shared object hitbox (rocks, poop, barrels). */
+export const OBJECT_HITBOX_INSET = 3;
+export const OBJECT_HITBOX_RADIUS = 5;
 
-/** Poop barrier hitbox tuning. */
-export const POOP_HITBOX_INSET = 5;
-export const POOP_HITBOX_RADIUS = 6;
+/** @deprecated use OBJECT_HITBOX_* */
+export const ROCK_HITBOX_INSET = OBJECT_HITBOX_INSET;
+/** @deprecated use OBJECT_HITBOX_* */
+export const ROCK_HITBOX_RADIUS = OBJECT_HITBOX_RADIUS;
+
 export const POOP_HITS_TO_DESTROY = 4;
 
 export const BOMB_RADIUS = 14;
@@ -37,12 +38,10 @@ export const BOMB_FUSE = 2.6;
 export const BOMB_MAX_PER_ROOM = 3;
 export const BOMB_PLACE_COOLDOWN = 0.45;
 
-export const EXPLOSION_RADIUS_X = 64;
-export const EXPLOSION_RADIUS_Y = 38;
+export const EXPLOSION_RADIUS_X = 78;
+export const EXPLOSION_RADIUS_Y = 46;
 export const EXPLOSION_KNOCKBACK = 480;
 
-export const BARREL_HITBOX_INSET = 3;
-export const BARREL_HITBOX_RADIUS = 5;
 export const BARREL_HITS_TO_DESTROY = 3;
 
 export const DIRECTIONS = {

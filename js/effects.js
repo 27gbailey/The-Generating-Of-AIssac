@@ -123,19 +123,19 @@ export class BombExplosion {
     this.y = y;
     this.radiusX = radiusX;
     this.radiusY = radiusY;
-    this.life = 0.38;
-    this.maxLife = 0.38;
+    this.life = 0.42;
+    this.maxLife = 0.42;
     this.particles = [];
 
-    for (let i = 0; i < 16; i++) {
-      const angle = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI * 1.1;
-      const speed = 90 + Math.random() * 160;
+    for (let i = 0; i < 22; i++) {
+      const angle = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI * 1.15;
+      const speed = 110 + Math.random() * 190;
       this.particles.push({
         x: 0,
         y: 0,
         vx: Math.cos(angle) * speed,
         vy: Math.sin(angle) * speed,
-        size: 4 + Math.random() * 8,
+        size: 5 + Math.random() * 10,
       });
     }
   }
@@ -159,8 +159,8 @@ export class BombExplosion {
     const sy = layout.floorY + this.y;
     const t = 1 - this.life / this.maxLife;
     const alpha = (1 - t) * 0.8;
-    const rx = this.radiusX * (0.35 + t * 0.95);
-    const ry = this.radiusY * (0.25 + t * 0.85);
+    const rx = this.radiusX * (0.4 + t * 1.05);
+    const ry = this.radiusY * (0.3 + t * 0.95);
 
     ctx.save();
 

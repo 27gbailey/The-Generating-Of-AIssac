@@ -1,12 +1,16 @@
 import {
-  POOP_HITBOX_INSET,
-  POOP_HITBOX_RADIUS,
   POOP_HITS_TO_DESTROY,
   ROOM_HEIGHT,
   ROOM_WIDTH,
   TILE,
   TILE_SIZE,
 } from "./constants.js";
+import {
+  circleIntersectsObjectHitbox,
+  traceObjectRect,
+} from "./objectHitbox.js";
+
+export { objectHitbox as poopHitbox } from "./objectHitbox.js";
 
 export function initPoopStates(grid, existing = null) {
   const states = existing ? { ...existing } : {};
@@ -28,28 +32,6 @@ export function isPoopSolid(room, tx, ty) {
   return !state?.destroyed;
 }
 
-export function poopHitbox(tx, ty) {
-  const inset = POOP_HITBOX_INSET;
-  return {
-    left: tx * TILE_SIZE + inset,
-    top: ty * TILE_SIZE + inset,
-    width: TILE_SIZE - inset * 2,
-    height: TILE_SIZE - inset * 2,
-    radius: POOP_HITBOX_RADIUS,
-  };
-}
-
-function circleIntersectsRoundedRect(cx, cy, radius, rect) {
-  const centerX = rect.left + rect.width / 2;
-  const centerY = rect.top + rect.height / 2;
-  const halfW = rect.width / 2 - rect.radius;
-  const halfH = rect.height / 2 - rect.radius;
-  const localX = Math.abs(cx - centerX) - halfW;
-  const localY = Math.abs(cy - centerY) - halfH;
-  const outside = Math.hypot(Math.max(localX, 0), Math.max(localY, 0));
-  return outside - rect.radius <= radius;
-}
-
 export function findPoopHit(cx, cy, radius, room) {
   const minTx = Math.max(0, Math.floor((cx - radius) / TILE_SIZE));
   const maxTx = Math.min(ROOM_WIDTH - 1, Math.floor((cx + radius) / TILE_SIZE));
@@ -59,7 +41,7 @@ export function findPoopHit(cx, cy, radius, room) {
   for (let ty = minTy; ty <= maxTy; ty++) {
     for (let tx = minTx; tx <= maxTx; tx++) {
       if (!isPoopSolid(room, tx, ty)) continue;
-      if (circleIntersectsRoundedRect(cx, cy, radius, poopHitbox(tx, ty))) {
+      if (circleIntersectsObjectHitbox(cx, cy, radius, tx, ty)) {
         return { tx, ty, key: `${tx},${ty}` };
       }
     }
@@ -88,61 +70,63 @@ export function poopDamageStage(hits, destroyed) {
 
 export function drawPoop(ctx, px, py, hits, destroyed) {
   if (destroyed) {
-    ctx.fillStyle = "rgba(90, 70, 45, 0.18)";
-    ctx.beginPath();
-    ctx.ellipse(px + TILE_SIZE * 0.5, py + TILE_SIZE * 0.55, 14, 8, 0, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(90, 70, 45, 0.22)";
+    traceObjectRect(ctx, px, py);
     ctx.fill();
     return;
   }
 
   const stage = poopDamageStage(hits, destroyed);
-  const cx = px + TILE_SIZE * 0.5;
-  const cy = py + TILE_SIZE * 0.56;
-  const shrink = stage * 2;
-  const baseW = 34 - shrink;
-  const baseH = 24 - shrink * 0.65;
+  const shrink = stage * 1.5;
 
   ctx.save();
 
-  ctx.fillStyle = "#4a3520";
-  ctx.beginPath();
-  ctx.ellipse(cx, cy + 4, baseW * 0.55, baseH * 0.35, 0, 0, Math.PI * 2);
+  traceObjectRect(ctx, px, py);
+  ctx.fillStyle = "#3a2818";
   ctx.fill();
 
-  ctx.fillStyle = stage >= 2 ? "#6b4a28" : "#5c4022";
-  ctx.beginPath();
-  ctx.ellipse(cx, cy, baseW * 0.5, baseH * 0.5, 0, 0, Math.PI * 2);
+  ctx.save();
+  traceObjectRect(ctx, px + shrink * 0.5, py + shrink * 0.5);
+  ctx.clip();
+
+  const { x, y, w, h } = traceObjectRect(ctx, px, py);
+  const cx = x + w / 2;
+  const cy = y + h / 2;
+
+  const bodyGrad = ctx.createLinearGradient(x, y, x, y + h);
+  bodyGrad.addColorStop(0, stage >= 2 ? "#7a5530" : "#6a4828");
+  bodyGrad.addColorStop(0.55, stage >= 1 ? "#5c4022" : "#4a3520");
+  bodyGrad.addColorStop(1, "#3a2818");
+  ctx.fillStyle = bodyGrad;
   ctx.fill();
 
-  ctx.fillStyle = stage >= 1 ? "#7a5530" : "#6a4828";
+  ctx.fillStyle = "rgba(255, 255, 255, 0.07)";
   ctx.beginPath();
-  ctx.ellipse(cx - 4, cy - 3, baseW * 0.28, baseH * 0.32, -0.3, 0, Math.PI * 2);
+  ctx.ellipse(cx - w * 0.18, cy - h * 0.22, w * 0.14, h * 0.1, -0.35, 0, Math.PI * 2);
   ctx.fill();
 
-  if (stage === 0) {
-    ctx.fillStyle = "rgba(255,255,255,0.06)";
-    ctx.beginPath();
-    ctx.ellipse(cx - 6, cy - 5, 5, 3, -0.4, 0, Math.PI * 2);
-    ctx.fill();
-  }
+  ctx.fillStyle = "rgba(35, 22, 10, 0.35)";
+  ctx.beginPath();
+  ctx.ellipse(cx + w * 0.12, cy + h * 0.18, w * 0.22, h * 0.14, 0.2, 0, Math.PI * 2);
+  ctx.fill();
 
   if (stage >= 1) {
-    ctx.strokeStyle = "rgba(35, 22, 10, 0.55)";
-    ctx.lineWidth = 1.2;
+    ctx.strokeStyle = "rgba(25, 15, 8, 0.65)";
+    ctx.lineWidth = 1.4;
     ctx.beginPath();
-    ctx.moveTo(cx - 8, cy - 2);
-    ctx.lineTo(cx + 2, cy + 4);
-    ctx.moveTo(cx + 6, cy - 4);
-    ctx.lineTo(cx + 10, cy + 2);
+    ctx.moveTo(cx - w * 0.28, cy - h * 0.05);
+    ctx.lineTo(cx + w * 0.08, cy + h * 0.12);
+    ctx.moveTo(cx + w * 0.18, cy - h * 0.18);
+    ctx.lineTo(cx + w * 0.32, cy + h * 0.08);
     ctx.stroke();
   }
 
   if (stage >= 2) {
-    ctx.fillStyle = "#5c4022";
+    ctx.fillStyle = "#4a3520";
     for (const [ox, oy, r] of [
-      [-10, 6, 4],
-      [8, 8, 3.5],
-      [0, 10, 3],
+      [-w * 0.28, h * 0.22, w * 0.1],
+      [w * 0.22, h * 0.28, w * 0.08],
+      [0, h * 0.32, w * 0.07],
     ]) {
       ctx.beginPath();
       ctx.arc(cx + ox, cy + oy, r, 0, Math.PI * 2);
@@ -151,16 +135,18 @@ export function drawPoop(ctx, px, py, hits, destroyed) {
   }
 
   if (stage >= 3) {
-    ctx.fillStyle = "rgba(90, 70, 45, 0.45)";
+    ctx.fillStyle = "rgba(90, 70, 45, 0.5)";
     ctx.beginPath();
-    ctx.ellipse(cx, cy + 8, baseW * 0.65, 6, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = "#4a3520";
-    ctx.beginPath();
-    ctx.arc(cx - 6, cy + 4, 2.5, 0, Math.PI * 2);
-    ctx.arc(cx + 5, cy + 6, 2, 0, Math.PI * 2);
+    ctx.ellipse(cx, cy + h * 0.28, w * 0.42, h * 0.16, 0, 0, Math.PI * 2);
     ctx.fill();
   }
+
+  ctx.restore();
+
+  ctx.strokeStyle = "rgba(20, 12, 6, 0.55)";
+  ctx.lineWidth = 1.5;
+  traceObjectRect(ctx, px, py);
+  ctx.stroke();
 
   ctx.restore();
 }
