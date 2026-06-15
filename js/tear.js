@@ -1,5 +1,6 @@
 import { TILE_SIZE } from "./constants.js";
-import { circleHitsRoom } from "./roomSpace.js";
+import { circleHitsRoom, findPoopHit } from "./roomSpace.js";
+import { damagePoop } from "./poop.js";
 
 export const TEAR_MAX_RANGE = TILE_SIZE * 5;
 export const TEAR_SPEED = 340;
@@ -22,6 +23,13 @@ export class Tear {
 
     const nextX = this.x + this.vx * dt;
     const nextY = this.y + this.vy * dt;
+
+    const poopHit = findPoopHit(nextX, nextY, this.radius, room);
+    if (poopHit) {
+      damagePoop(room, poopHit.key);
+      this.state = "dead";
+      return { x: this.x, y: this.y, poop: true };
+    }
 
     if (circleHitsRoom(nextX, nextY, this.radius, room)) {
       this.state = "dead";

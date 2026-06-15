@@ -13,17 +13,29 @@ export const TILE = {
   WALL: "01",
   ROCK: "02",
   BLOOD: "03",
+  POOP: "04",
 };
 
 export const DOOR_WALLS = ["north", "east", "south", "west"];
 
 export const TILE_SIZE = 64;
-export const WALL_THICKNESS = 16;
+export const WALL_THICKNESS = 28;
 
 /** Inset rock collision/visual hitbox from each tile edge (px). */
-export const ROCK_HITBOX_INSET = 6;
+export const ROCK_HITBOX_INSET = 3;
 /** Corner radius for rock hitboxes (px). */
-export const ROCK_HITBOX_RADIUS = 12;
+export const ROCK_HITBOX_RADIUS = 5;
+
+/** Poop barrier hitbox tuning. */
+export const POOP_HITBOX_INSET = 5;
+export const POOP_HITBOX_RADIUS = 6;
+export const POOP_HITS_TO_DESTROY = 4;
+
+export const BOMB_RADIUS = 14;
+export const BOMB_FUSE = 2.6;
+export const BOMB_EXPLOSION_RADIUS = 50;
+export const BOMB_MAX_PER_ROOM = 3;
+export const BOMB_PLACE_COOLDOWN = 0.45;
 
 export const DIRECTIONS = {
   north: { dx: 0, dy: -1, opposite: "south" },
@@ -39,4 +51,4 @@ export const DOOR_CLEARANCE = {
   east: [{ x: 12, y: 2 }, { x: 12, y: 3 }],
 };
 
-export const BLOCKING_TILES = new Set([TILE.ROCK, TILE.WALL]);
+export const BLOCKING_TILES = new Set([TILE.ROCK, TILE.WALL, TILE.POOP]);

@@ -14,116 +14,130 @@ function place(grid, x, y, code) {
   }
 }
 
-function scatterRocks(grid, coords) {
-  for (const [x, y] of coords) place(grid, x, y, TILE.ROCK);
+function buildLayout({ rocks = [], poops = [], blood = [] } = {}) {
+  const grid = createEmptyGrid();
+  for (const [x, y] of rocks) place(grid, x, y, TILE.ROCK);
+  for (const [x, y] of poops) place(grid, x, y, TILE.POOP);
+  for (const [x, y] of blood) place(grid, x, y, TILE.BLOOD);
   return grid;
 }
 
-const LAYOUT_BUILDERS = {
-  empty: () => createEmptyGrid(),
+const PRESET_LAYOUTS = {
+  empty: {},
 
-  single_center: () => scatterRocks(createEmptyGrid(), [[6, 3]]),
+  // Rock-focused layouts
+  single_center: { rocks: [[6, 3]] },
+  twin_rocks: { rocks: [[4, 3], [8, 3]] },
+  diagonal_pair: { rocks: [[3, 2], [9, 4]] },
+  corner_rocks: { rocks: [[2, 1], [10, 1], [2, 5], [10, 5]] },
+  north_arc: { rocks: [[3, 1], [4, 2], [6, 1], [8, 2], [9, 1]] },
+  south_arc: { rocks: [[3, 5], [4, 4], [6, 5], [8, 4], [9, 5]] },
+  side_pillars: { rocks: [[2, 2], [2, 4], [10, 2], [10, 4]] },
+  cross_plus: {
+    rocks: [[6, 1], [6, 2], [6, 4], [6, 5], [4, 3], [5, 3], [7, 3], [8, 3]],
+  },
+  u_shape: {
+    rocks: [[4, 2], [4, 3], [4, 4], [8, 2], [8, 3], [8, 4], [5, 4], [6, 4], [7, 4]],
+  },
+  center_island: {
+    rocks: [[5, 2], [6, 2], [7, 2], [5, 3], [7, 3], [5, 4], [6, 4], [7, 4]],
+  },
+  north_wall: { rocks: [[2, 1], [3, 1], [4, 1], [8, 1], [9, 1], [10, 1]] },
+  south_wall: { rocks: [[2, 5], [3, 5], [4, 5], [8, 5], [9, 5], [10, 5]] },
+  alcove: { rocks: [[1, 2], [1, 3], [1, 4], [11, 2], [11, 3], [11, 4]] },
+  zigzag: { rocks: [[3, 1], [5, 2], [7, 3], [5, 4], [3, 5]] },
+  sparse_ring: { rocks: [[5, 1], [7, 1], [9, 3], [7, 5], [5, 5], [3, 3]] },
+  rock_cluster: { rocks: [[5, 2], [6, 2], [7, 2], [6, 3], [6, 4]] },
+  scattered_a: { rocks: [[3, 2], [8, 1], [5, 4], [9, 5], [2, 4]] },
+  scattered_b: { rocks: [[4, 1], [7, 2], [3, 5], [10, 4], [8, 5]] },
+  hallway_blocks: { rocks: [[3, 3], [9, 3], [3, 2], [9, 4]] },
 
-  corner_rocks: () =>
-    scatterRocks(createEmptyGrid(), [
-      [2, 1], [10, 1], [2, 5], [10, 5],
-    ]),
+  // Poop-focused layouts
+  poop_lane: { poops: [[4, 3], [5, 3], [6, 3], [7, 3], [8, 3]] },
+  poop_cross: { poops: [[6, 2], [6, 3], [6, 4], [5, 3], [7, 3]] },
+  poop_snake: {
+    poops: [[3, 2], [4, 3], [5, 2], [6, 3], [7, 2], [8, 3], [9, 2]],
+  },
+  poop_scatter: { poops: [[3, 2], [8, 1], [10, 4], [2, 5], [6, 4], [4, 3]] },
+  poop_ring: { poops: [[5, 1], [7, 1], [9, 3], [7, 5], [5, 5], [3, 3]] },
+  poop_stacks: { poops: [[4, 2], [4, 3], [8, 3], [8, 4], [6, 5]] },
+  poop_mire: {
+    poops: [[2, 2], [3, 3], [4, 4], [8, 2], [9, 3], [10, 4], [6, 3], [5, 4], [7, 2]],
+  },
+  poop_fork: { poops: [[4, 3], [6, 3], [8, 3], [5, 4], [7, 4], [6, 5]] },
+  poop_diamond: { poops: [[6, 2], [5, 3], [7, 3], [6, 4], [4, 3], [8, 3]] },
+  poop_corners: { poops: [[2, 1], [10, 1], [2, 5], [10, 5]] },
 
-  north_arc: () =>
-    scatterRocks(createEmptyGrid(), [
-      [3, 1], [4, 2], [6, 1], [8, 2], [9, 1],
-    ]),
+  // Clever mixed layouts
+  poop_gate: {
+    rocks: [[4, 2], [8, 2], [4, 4], [8, 4]],
+    poops: [[6, 3]],
+  },
+  poop_guards: {
+    rocks: [[3, 2], [3, 4], [9, 2], [9, 4]],
+    poops: [[6, 3]],
+  },
+  poop_bridge: {
+    rocks: [[2, 2], [10, 4]],
+    poops: [[5, 3], [6, 3], [7, 3]],
+  },
+  poop_alley: {
+    rocks: [[2, 2], [2, 4], [10, 2], [10, 4]],
+    poops: [[5, 3], [6, 3], [7, 3], [8, 3]],
+  },
+  poop_teeth: {
+    rocks: [[4, 2], [8, 2], [4, 4], [8, 4]],
+    poops: [[5, 3], [7, 3]],
+  },
+  poop_flank: {
+    rocks: [[6, 3]],
+    poops: [[3, 2], [3, 4], [9, 2], [9, 4]],
+  },
+  poop_islands: {
+    rocks: [[4, 2], [8, 4]],
+    poops: [[3, 4], [9, 2], [6, 3]],
+  },
+  poop_pillars: {
+    rocks: [[3, 2], [9, 2], [3, 4], [9, 4]],
+    poops: [[6, 3]],
+  },
+  blocked_pass: {
+    rocks: [[5, 2], [7, 2], [5, 4], [7, 4], [4, 3], [8, 3]],
+    poops: [[6, 3]],
+  },
+  rock_poop_split: {
+    rocks: [[3, 2], [3, 4], [9, 2], [9, 4]],
+    poops: [[6, 1], [6, 5]],
+  },
+  poop_cluster: {
+    poops: [[5, 2], [6, 2], [7, 2], [6, 3], [6, 4]],
+    rocks: [[2, 3], [10, 3]],
+  },
+  poop_steps: {
+    poops: [[3, 4], [5, 3], [7, 2], [9, 3]],
+    rocks: [[6, 5], [2, 2]],
+  },
 
-  south_arc: () =>
-    scatterRocks(createEmptyGrid(), [
-      [3, 5], [4, 4], [6, 5], [8, 4], [9, 5],
-    ]),
-
-  side_pillars: () =>
-    scatterRocks(createEmptyGrid(), [
-      [2, 2], [2, 4], [10, 2], [10, 4],
-    ]),
-
-  cross_plus: () =>
-    scatterRocks(createEmptyGrid(), [
-      [6, 1], [6, 2], [6, 4], [6, 5],
-      [4, 3], [5, 3], [7, 3], [8, 3],
-    ]),
-
-  scattered_a: () =>
-    scatterRocks(createEmptyGrid(), [
-      [3, 2], [8, 1], [5, 4], [9, 5], [2, 4],
-    ]),
-
-  scattered_b: () =>
-    scatterRocks(createEmptyGrid(), [
-      [4, 1], [7, 2], [3, 5], [10, 4], [8, 5],
-    ]),
-
-  u_shape: () =>
-    scatterRocks(createEmptyGrid(), [
-      [4, 2], [4, 3], [4, 4], [8, 2], [8, 3], [8, 4], [5, 4], [6, 4], [7, 4],
-    ]),
-
-  center_island: () =>
-    scatterRocks(createEmptyGrid(), [
-      [5, 2], [6, 2], [7, 2], [5, 3], [7, 3], [5, 4], [6, 4], [7, 4],
-    ]),
-
-  twin_rocks: () => scatterRocks(createEmptyGrid(), [[4, 3], [8, 3]]),
-
-  diagonal_pair: () => scatterRocks(createEmptyGrid(), [[3, 2], [9, 4]]),
-
-  north_wall: () =>
-    scatterRocks(createEmptyGrid(), [
-      [2, 1], [3, 1], [4, 1], [8, 1], [9, 1], [10, 1],
-    ]),
-
-  south_wall: () =>
-    scatterRocks(createEmptyGrid(), [
-      [2, 5], [3, 5], [4, 5], [8, 5], [9, 5], [10, 5],
-    ]),
-
-  alcove: () =>
-    scatterRocks(createEmptyGrid(), [
-      [1, 2], [1, 3], [1, 4], [11, 2], [11, 3], [11, 4],
-    ]),
-
-  zigzag: () =>
-    scatterRocks(createEmptyGrid(), [
-      [3, 1], [5, 2], [7, 3], [5, 4], [3, 5],
-    ]),
-
-  sparse_ring: () =>
-    scatterRocks(createEmptyGrid(), [
-      [5, 1], [7, 1], [9, 3], [7, 5], [5, 5], [3, 3],
-    ]),
-
-  rock_cluster: () =>
-    scatterRocks(createEmptyGrid(), [
-      [5, 2], [6, 2], [7, 2], [6, 3], [6, 4],
-    ]),
-
-  hallway_blocks: () =>
-    scatterRocks(createEmptyGrid(), [
-      [3, 3], [9, 3], [3, 2], [9, 4],
-    ]),
-
-  boss_chamber: () => {
-    const grid = createEmptyGrid();
-    const bloodCoords = [
+  boss_chamber: {
+    blood: [
       [1, 0], [2, 0], [10, 0], [11, 0], [0, 1], [12, 1],
       [1, 6], [11, 6], [0, 5], [12, 5], [2, 6], [10, 6],
       [3, 1], [9, 1], [4, 5], [8, 5], [5, 0], [7, 6],
       [2, 3], [10, 3], [6, 1], [6, 5], [3, 3], [9, 3],
       [4, 2], [8, 4], [5, 2], [7, 4], [1, 4], [11, 2],
       [2, 2], [10, 4], [4, 4], [8, 2], [6, 6], [6, 0],
-    ];
-    for (const [x, y] of bloodCoords) place(grid, x, y, TILE.BLOOD);
-    place(grid, 6, 3, TILE.ROCK);
-    return grid;
+    ],
+    rocks: [[6, 3]],
+    poops: [[4, 3], [8, 3]],
   },
 };
+
+const LAYOUT_BUILDERS = Object.fromEntries(
+  Object.entries(PRESET_LAYOUTS).map(([id, layout]) => [
+    id,
+    () => buildLayout(layout),
+  ])
+);
 
 export const BOSS_PRESET = "boss_chamber";
 
@@ -209,6 +223,8 @@ export function buildRoomFromPreset(presetId, doors) {
     presetId,
     isBoss: preset.isBoss,
     blockedWalls: getBlockedWalls(room.grid),
+    poopStates: null,
+    destroyedRocks: null,
   };
 }
 

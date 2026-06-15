@@ -3,6 +3,7 @@ const KEY_MAP = {
   a: "a",
   s: "s",
   d: "d",
+  e: "e",
   arrowup: "arrowup",
   arrowdown: "arrowdown",
   arrowleft: "arrowleft",
@@ -21,6 +22,7 @@ const CARDINALS = {
 export function createInputState() {
   return {
     keys: new Set(),
+    justPressed: new Set(),
   };
 }
 
@@ -29,6 +31,9 @@ export function bindInput(input) {
     const key = KEY_MAP[e.key.toLowerCase()];
     if (!key) return;
     e.preventDefault();
+    if (!input.keys.has(key)) {
+      input.justPressed.add(key);
+    }
     input.keys.add(key);
   });
 
@@ -37,6 +42,10 @@ export function bindInput(input) {
     if (!key) return;
     input.keys.delete(key);
   });
+}
+
+export function clearInputFrame(input) {
+  input.justPressed.clear();
 }
 
 export function getBodyVector(keys) {

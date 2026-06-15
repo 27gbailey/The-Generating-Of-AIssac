@@ -11,6 +11,8 @@ import {
 } from "./rooms.js";
 import { getPlayAreaSize } from "./roomSpace.js";
 import { isInDoorGap } from "./doors.js";
+import { initPoopStates } from "./poop.js";
+import { initDestroyedRocks } from "./destructibles.js";
 
 function mulberry32(seed) {
   return function rand() {
@@ -227,10 +229,25 @@ export function generateDungeon(seed = Date.now()) {
   const rooms = {};
   for (const cell of Object.values(cells)) {
     const doors = computeDoors(cell, cells, cell.presetId);
+    const built = buildRoomFromPreset(cell.presetId, doors);
+    if (!cell.poopStates) {
+      cell.poopStates = initPoopStates(built.grid);
+    }
+    if (!cell.destroyedRocks) {
+      cell.destroyedRocks = initDestroyedRocks(built.grid);
+    }
+    if (!cell.bombs) {
+      cell.bombs = [];
+    }
+    built.poopStates = cell.poopStates;
+    built.destroyedRocks = cell.destroyedRocks;
     rooms[`${cell.gx},${cell.gy}`] = {
       ...cell,
       doors,
-      room: buildRoomFromPreset(cell.presetId, doors),
+      poopStates: cell.poopStates,
+      destroyedRocks: cell.destroyedRocks,
+      bombs: cell.bombs,
+      room: built,
     };
   }
 

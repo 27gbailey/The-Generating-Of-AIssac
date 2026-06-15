@@ -9,6 +9,8 @@ import {
   WALL_THICKNESS,
 } from "./constants.js";
 import { doorSegment } from "./doors.js";
+import { isRockSolid } from "./destructibles.js";
+import { drawPoop } from "./poop.js";
 import {
   createRoomAmbience,
   drawRoomAmbience,
@@ -89,32 +91,66 @@ function drawRock(ctx, px, py) {
   ctx.stroke();
 }
 
-function textureBand(ctx, x, y, w, h, horizontal) {
+function textureBand(ctx, x, y, w, h, horizontal, wallSide) {
   ctx.fillStyle = WALL_FACE;
   ctx.fillRect(x, y, w, h);
+
   ctx.fillStyle = WALL_TOP;
   if (horizontal) {
-    ctx.fillRect(x, y, w, Math.max(3, h * 0.35));
+    ctx.fillRect(x, y, w, Math.max(4, h * 0.38));
   } else {
-    ctx.fillRect(x, y, Math.max(3, w * 0.35), h);
+    ctx.fillRect(x, y, Math.max(4, w * 0.38), h);
   }
 
-  ctx.strokeStyle = "rgba(0,0,0,0.25)";
+  ctx.strokeStyle = "rgba(0,0,0,0.3)";
   ctx.lineWidth = 1;
   if (horizontal) {
-    for (let i = x + 8; i < x + w; i += 14) {
+    for (let i = x + 10; i < x + w; i += 16) {
       ctx.beginPath();
-      ctx.moveTo(i, y + 2);
-      ctx.lineTo(i, y + h - 2);
+      ctx.moveTo(i, y + 3);
+      ctx.lineTo(i, y + h - 3);
       ctx.stroke();
     }
   } else {
-    for (let i = y + 8; i < y + h; i += 14) {
+    for (let i = y + 10; i < y + h; i += 16) {
       ctx.beginPath();
-      ctx.moveTo(x + 2, i);
-      ctx.lineTo(x + w - 2, i);
+      ctx.moveTo(x + 3, i);
+      ctx.lineTo(x + w - 3, i);
       ctx.stroke();
     }
+  }
+
+  drawWallInnerShadow(ctx, x, y, w, h, horizontal, wallSide);
+}
+
+function drawWallInnerShadow(ctx, x, y, w, h, horizontal, wallSide) {
+  const shadowDepth = 22;
+  let grad;
+
+  if (wallSide === "north") {
+    grad = ctx.createLinearGradient(x, y + h, x, y + h + shadowDepth);
+    grad.addColorStop(0, "rgba(0, 0, 0, 0.42)");
+    grad.addColorStop(1, "rgba(0, 0, 0, 0)");
+    ctx.fillStyle = grad;
+    ctx.fillRect(x, y + h, w, shadowDepth);
+  } else if (wallSide === "south") {
+    grad = ctx.createLinearGradient(x, y, x, y - shadowDepth);
+    grad.addColorStop(0, "rgba(0, 0, 0, 0.38)");
+    grad.addColorStop(1, "rgba(0, 0, 0, 0)");
+    ctx.fillStyle = grad;
+    ctx.fillRect(x, y - shadowDepth, w, shadowDepth);
+  } else if (wallSide === "west") {
+    grad = ctx.createLinearGradient(x + w, y, x + w + shadowDepth, y);
+    grad.addColorStop(0, "rgba(0, 0, 0, 0.4)");
+    grad.addColorStop(1, "rgba(0, 0, 0, 0)");
+    ctx.fillStyle = grad;
+    ctx.fillRect(x + w, y, shadowDepth, h);
+  } else if (wallSide === "east") {
+    grad = ctx.createLinearGradient(x, y, x - shadowDepth, y);
+    grad.addColorStop(0, "rgba(0, 0, 0, 0.4)");
+    grad.addColorStop(1, "rgba(0, 0, 0, 0)");
+    ctx.fillStyle = grad;
+    ctx.fillRect(x - shadowDepth, y, shadowDepth, h);
   }
 }
 
@@ -149,19 +185,26 @@ function drawDoor(ctx, originX, originY, segment, wall) {
 }
 
 function drawWalls(ctx, originX, originY, width, height, room, isBoss = false) {
-  const floorX = originX + WALL_THICKNESS;
-  const floorY = originY + WALL_THICKNESS;
-  const floorW = ROOM_WIDTH * TILE_SIZE;
-  const floorH = ROOM_HEIGHT * TILE_SIZE;
-
-  textureBand(ctx, originX, originY, width, WALL_THICKNESS, true);
-  textureBand(ctx, originX, originY + height - WALL_THICKNESS, width, WALL_THICKNESS, true);
-  textureBand(ctx, originX, originY, WALL_THICKNESS, height, false);
-  textureBand(ctx, originX + width - WALL_THICKNESS, originY, WALL_THICKNESS, height, false);
-
-  ctx.fillStyle = "rgba(0,0,0,0.12)";
-  ctx.fillRect(floorX, floorY + floorH - 4, floorW, 4);
-  ctx.fillRect(floorX + floorW - 4, floorY, 4, floorH);
+  textureBand(ctx, originX, originY, width, WALL_THICKNESS, true, "north");
+  textureBand(
+    ctx,
+    originX,
+    originY + height - WALL_THICKNESS,
+    width,
+    WALL_THICKNESS,
+    true,
+    "south"
+  );
+  textureBand(ctx, originX, originY, WALL_THICKNESS, height, false, "west");
+  textureBand(
+    ctx,
+    originX + width - WALL_THICKNESS,
+    originY,
+    WALL_THICKNESS,
+    height,
+    false,
+    "east"
+  );
 
   if (isBoss) {
     ctx.fillStyle = "rgba(90, 15, 15, 0.45)";
@@ -208,7 +251,12 @@ export function drawRoom(ctx, room, offsetX, offsetY, options = {}) {
         ctx.arc(px + TILE_SIZE * 0.65, py + TILE_SIZE * 0.55, TILE_SIZE * 0.22, 0, Math.PI * 2);
         ctx.fill();
       } else if (code === TILE.ROCK) {
-        drawRock(ctx, px, py);
+        if (isRockSolid(room, x, y)) {
+          drawRock(ctx, px, py);
+        }
+      } else if (code === TILE.POOP) {
+        const state = room.poopStates?.[`${x},${y}`] ?? { hits: 0, destroyed: false };
+        drawPoop(ctx, px, py, state.hits, state.destroyed);
       } else if (code !== TILE.FLOOR) {
         ctx.fillStyle = TILE_COLORS[code] ?? "#ff00ff";
         ctx.fillRect(px + 4, py + 4, TILE_SIZE - 8, TILE_SIZE - 8);

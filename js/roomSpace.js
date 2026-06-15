@@ -9,6 +9,8 @@ import {
   WALL_THICKNESS,
 } from "./constants.js";
 import { isInDoorGap } from "./doors.js";
+import { isRockSolid } from "./destructibles.js";
+import { findPoopHit, isPoopSolid, poopHitbox } from "./poop.js";
 
 export function getPlayAreaSize() {
   return {
@@ -39,8 +41,11 @@ export function playToScreen(x, y, layout) {
 }
 
 
-function isSolidTile(code) {
-  return code === TILE.WALL || code === TILE.ROCK;
+function isSolidTile(code, room, tx, ty) {
+  if (code === TILE.WALL) return true;
+  if (code === TILE.ROCK) return isRockSolid(room, tx, ty);
+  if (code === TILE.POOP) return isPoopSolid(room, tx, ty);
+  return false;
 }
 
 function rockHitbox(tx, ty) {
@@ -113,9 +118,11 @@ export function circleHitsRoom(cx, cy, radius, room) {
   for (let ty = minTy; ty <= maxTy; ty++) {
     for (let tx = minTx; tx <= maxTx; tx++) {
       const code = room.grid[ty][tx];
-      if (!isSolidTile(code)) continue;
+      if (!isSolidTile(code, room, tx, ty)) continue;
       if (code === TILE.ROCK) {
         if (circleIntersectsRoundedRect(cx, cy, radius, rockHitbox(tx, ty))) return true;
+      } else if (code === TILE.POOP) {
+        if (circleIntersectsRoundedRect(cx, cy, radius, poopHitbox(tx, ty))) return true;
       } else if (circleIntersectsTile(cx, cy, radius, tx, ty)) {
         return true;
       }
@@ -139,4 +146,4 @@ export function getSpawnPosition(room) {
   return { x: width / 2, y: height / 2 };
 }
 
-export { DOOR_WALLS, WALL_THICKNESS };
+export { DOOR_WALLS, WALL_THICKNESS, findPoopHit };
