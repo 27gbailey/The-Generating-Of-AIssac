@@ -1,6 +1,6 @@
 import { getRoomCatalogEntry } from "./rooms.js";
-import { drawRoom, roomPixelSize } from "./render.js";
-import { getRoomScreenLayout, getSpawnPosition, getPlayAreaSize } from "./roomSpace.js";
+import { drawRoom, roomPixelSize, tickRoomAmbience } from "./render.js";
+import { getRoomScreenLayout, getSpawnPosition } from "./roomSpace.js";
 import { createInputState, bindInput } from "./input.js";
 import { AIsaac } from "./player.js";
 import { TearBurst } from "./effects.js";
@@ -23,8 +23,8 @@ bindInput(input);
 let game = null;
 let lastTime = performance.now();
 
-function easeOutCubic(t) {
-  return 1 - (1 - t) ** 3;
+function easeInOutCubic(t) {
+  return t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2;
 }
 
 function showError(message) {
@@ -73,14 +73,27 @@ function updateHud() {
   roomIdEl.textContent = game.room.roomId;
 }
 
+function roomDrawOptions(gx, gy) {
+  return {
+    cellKey: `${gx},${gy}`,
+    dungeonSeed: game.dungeon.seed,
+  };
+}
+
 function beginRoomTransition(transition) {
+  const entry = entryPosition(transition.entry);
   game.roomTransition = {
     ...transition,
     progress: 0,
-    duration: 0.36,
+    duration: 0.42,
     fromRoom: game.room,
     fromGx: game.gx,
     fromGy: game.gy,
+    exitX: game.player.x,
+    exitY: game.player.y,
+    entryX: entry.x,
+    entryY: entry.y,
+    pendingFinish: false,
   };
   game.tears = [];
   game.bursts = [];
@@ -93,9 +106,8 @@ function finishRoomTransition() {
   game.gx = transition.gx;
   game.gy = transition.gy;
   game.room = transition.room;
-  const pos = entryPosition(transition.entry);
-  game.player.x = pos.x;
-  game.player.y = pos.y;
+  game.player.x = transition.entryX;
+  game.player.y = transition.entryY;
   game.dungeon.visited.add(`${game.gx},${game.gy}`);
   game.roomTransition = null;
   updateHud();
@@ -105,12 +117,27 @@ function update(dt) {
   if (!game) return;
 
   if (game.roomTransition) {
-    game.roomTransition.progress += dt / game.roomTransition.duration;
+    game.roomTransition.progress = Math.min(
+      1,
+      game.roomTransition.progress + dt / game.roomTransition.duration
+    );
+    tickRoomAmbience(
+      `${game.roomTransition.fromGx},${game.roomTransition.fromGy}`,
+      dt,
+      game.dungeon.seed
+    );
+    tickRoomAmbience(
+      `${game.roomTransition.gx},${game.roomTransition.gy}`,
+      dt,
+      game.dungeon.seed
+    );
     if (game.roomTransition.progress >= 1) {
-      finishRoomTransition();
+      game.roomTransition.pendingFinish = true;
     }
     return;
   }
+
+  tickRoomAmbience(`${game.gx},${game.gy}`, dt, game.dungeon.seed);
 
   const tear = game.player.update(dt, input.keys, game.room);
   if (tear) game.tears.push(tear);
@@ -140,7 +167,7 @@ function update(dt) {
   game.bursts = game.bursts.filter((b) => !b.dead);
 }
 
-function drawWorldContents(layout, centerPlayer = false) {
+function drawWorldContents(layout, screenOverride = null) {
   for (const tear of game.tears) {
     tear.draw(ctx, layout);
   }
@@ -149,19 +176,38 @@ function drawWorldContents(layout, centerPlayer = false) {
     burst.draw(ctx, layout);
   }
 
-  if (centerPlayer) {
-    const { width, height } = getPlayAreaSize();
-    const savedX = game.player.x;
-    const savedY = game.player.y;
-    game.player.x = width / 2;
-    game.player.y = height / 2;
-    game.player.draw(ctx, layout);
-    game.player.x = savedX;
-    game.player.y = savedY;
-    return;
-  }
+  game.player.draw(ctx, layout, screenOverride);
+}
 
-  game.player.draw(ctx, layout);
+function drawTransition() {
+  const tr = game.roomTransition;
+  const t = easeInOutCubic(tr.progress);
+  const cx = canvas.width / 2;
+  const cy = canvas.height / 2;
+  const { width, height } = roomPixelSize();
+  const dx = tr.gx - tr.fromGx;
+  const dy = tr.gy - tr.fromGy;
+
+  const fromOffsetX = cx - dx * width * t;
+  const fromOffsetY = cy - dy * height * t;
+  const toOffsetX = cx + dx * width * (1 - t);
+  const toOffsetY = cy + dy * height * (1 - t);
+
+  drawRoom(ctx, tr.fromRoom, fromOffsetX, fromOffsetY, roomDrawOptions(tr.fromGx, tr.fromGy));
+  drawRoom(ctx, tr.room, toOffsetX, toOffsetY, roomDrawOptions(tr.gx, tr.gy));
+
+  const fromLayout = getRoomScreenLayout(fromOffsetX, fromOffsetY);
+  const toLayout = getRoomScreenLayout(toOffsetX, toOffsetY);
+
+  const fromScreenX = fromLayout.floorX + tr.exitX;
+  const fromScreenY = fromLayout.floorY + tr.exitY;
+  const toScreenX = toLayout.floorX + tr.entryX;
+  const toScreenY = toLayout.floorY + tr.entryY;
+
+  drawWorldContents(toLayout, {
+    x: fromScreenX + (toScreenX - fromScreenX) * t,
+    y: fromScreenY + (toScreenY - fromScreenY) * t,
+  });
 }
 
 function draw() {
@@ -169,32 +215,12 @@ function draw() {
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   if (!game) return;
 
-  const cx = canvas.width / 2;
-  const cy = canvas.height / 2;
-  const { width, height } = roomPixelSize();
-
   if (game.roomTransition) {
-    const t = easeOutCubic(Math.min(game.roomTransition.progress, 1));
-    const dx = game.roomTransition.gx - game.roomTransition.fromGx;
-    const dy = game.roomTransition.gy - game.roomTransition.fromGy;
-
-    drawRoom(
-      ctx,
-      game.roomTransition.fromRoom,
-      cx - dx * width * t,
-      cy - dy * height * t
-    );
-    drawRoom(
-      ctx,
-      game.roomTransition.room,
-      cx + dx * width * (1 - t),
-      cy + dy * height * (1 - t)
-    );
-
-    const layout = getRoomScreenLayout(cx, cy);
-    drawWorldContents(layout, true);
+    drawTransition();
   } else {
-    drawRoom(ctx, game.room, cx, cy);
+    const cx = canvas.width / 2;
+    const cy = canvas.height / 2;
+    drawRoom(ctx, game.room, cx, cy, roomDrawOptions(game.gx, game.gy));
     const layout = getRoomScreenLayout(cx, cy);
     drawWorldContents(layout);
   }
@@ -207,6 +233,10 @@ function draw() {
 function loop(timestamp) {
   const dt = Math.min((timestamp - lastTime) / 1000, 0.05);
   lastTime = timestamp;
+
+  if (game?.roomTransition?.pendingFinish) {
+    finishRoomTransition();
+  }
 
   update(dt);
   draw();

@@ -93,9 +93,9 @@ export class AIsaac {
     return spawnTear(this, this.headDir);
   }
 
-  draw(ctx, layout) {
-    const screenX = layout.floorX + this.x;
-    const screenY = layout.floorY + this.y;
+  draw(ctx, layout, screenOverride = null) {
+    const screenX = screenOverride ? screenOverride.x : layout.floorX + this.x;
+    const screenY = screenOverride ? screenOverride.y : layout.floorY + this.y;
     const bob = this.isWalking ? Math.sin(this.walkPhase) * 2 : 0;
     const legSwing = this.isWalking ? Math.sin(this.walkPhase) * 7 : 0;
     const scale = 1.35;
@@ -116,25 +116,26 @@ export class AIsaac {
     ctx.fillStyle = "#c9956a";
     ctx.strokeStyle = "#8b6914";
     ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.rect(x - 3.5, y, 7, 11);
-    ctx.fill();
-    ctx.stroke();
+    ctx.fillRect(x - 3.5, y, 7, 11);
+    ctx.strokeRect(x - 3.5, y, 7, 11);
   }
 
   drawBody(ctx) {
     ctx.fillStyle = "#e8c49a";
     ctx.strokeStyle = "#9a7348";
     ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.rect(-10, 2, 20, 16);
-    ctx.fill();
-    ctx.stroke();
+    ctx.fillRect(-10, 2, 20, 16);
+    ctx.strokeRect(-10, 2, 20, 16);
   }
 
   drawHead(ctx) {
     const hx = this.headOffsetX();
     const hy = -8 + this.headOffsetY();
+
+    if (this.headDir.y === 1) {
+      this.drawHeadBack(ctx, hx, hy);
+      return;
+    }
 
     ctx.fillStyle = "#f5deb3";
     ctx.strokeStyle = "#8b6914";
@@ -145,6 +146,23 @@ export class AIsaac {
     ctx.stroke();
 
     this.drawFace(ctx, hx, hy);
+  }
+
+  drawHeadBack(ctx, hx, hy) {
+    ctx.fillStyle = "#6b4a2e";
+    ctx.strokeStyle = "#4a3018";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(hx, hy, 15, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.strokeStyle = "#4a3018";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(hx - 8, hy - 4);
+    ctx.quadraticCurveTo(hx, hy - 10, hx + 8, hy - 4);
+    ctx.stroke();
   }
 
   headOffsetX() {
@@ -159,48 +177,57 @@ export class AIsaac {
 
   drawFace(ctx, hx, hy) {
     if (this.headDir.y === -1) {
-      this.drawSadEyesFront(ctx, hx, hy);
-      this.drawFrown(ctx, hx, hy + 5, 0);
-      return;
-    }
-
-    if (this.headDir.y === 1) {
-      ctx.fillStyle = "#5a3a1a";
-      ctx.beginPath();
-      ctx.arc(hx, hy + 3, 9, 0, Math.PI);
-      ctx.fill();
+      this.drawSadFaceFront(ctx, hx, hy);
       return;
     }
 
     const side = this.headDir.x > 0 ? 1 : -1;
+    this.drawSadFaceSide(ctx, hx, hy, side);
+  }
+
+  drawSadFaceFront(ctx, hx, hy) {
+    ctx.strokeStyle = "#3a2a22";
+    ctx.lineWidth = 2;
+    ctx.lineCap = "round";
+
+    ctx.beginPath();
+    ctx.moveTo(hx - 8, hy - 5);
+    ctx.lineTo(hx - 4, hy - 3);
+    ctx.moveTo(hx + 8, hy - 5);
+    ctx.lineTo(hx + 4, hy - 3);
+    ctx.stroke();
+
     ctx.fillStyle = "#222";
     ctx.beginPath();
-    ctx.arc(hx + side * 4, hy - 1, 3, 0, Math.PI * 2);
+    ctx.arc(hx - 5, hy - 1, 2.2, 0, Math.PI * 2);
+    ctx.arc(hx + 5, hy - 1, 2.2, 0, Math.PI * 2);
     ctx.fill();
-    this.drawFrown(ctx, hx + side * 3, hy + 5, side * 0.4);
-  }
 
-  drawSadEyesFront(ctx, hx, hy) {
-    ctx.strokeStyle = "#222";
-    ctx.lineWidth = 2;
-    ctx.lineCap = "round";
-
+    ctx.strokeStyle = "#5a4040";
     ctx.beginPath();
-    ctx.arc(hx - 5, hy - 1, 3, Math.PI * 0.1, Math.PI * 0.9);
-    ctx.stroke();
-
-    ctx.beginPath();
-    ctx.arc(hx + 5, hy - 1, 3, Math.PI * 0.1, Math.PI * 0.9);
+    ctx.moveTo(hx - 4, hy + 6);
+    ctx.quadraticCurveTo(hx, hy + 3, hx + 4, hy + 6);
     ctx.stroke();
   }
 
-  drawFrown(ctx, hx, hy, tilt) {
-    ctx.strokeStyle = "#6a4a4a";
+  drawSadFaceSide(ctx, hx, hy, side) {
+    ctx.strokeStyle = "#3a2a22";
     ctx.lineWidth = 2;
     ctx.lineCap = "round";
     ctx.beginPath();
-    ctx.moveTo(hx - 4 + tilt, hy);
-    ctx.quadraticCurveTo(hx + tilt, hy + 3, hx + 4 + tilt, hy);
+    ctx.moveTo(hx + side * 2, hy - 6);
+    ctx.lineTo(hx + side * 6, hy - 4);
+    ctx.stroke();
+
+    ctx.fillStyle = "#222";
+    ctx.beginPath();
+    ctx.arc(hx + side * 5, hy - 1, 2.2, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = "#5a4040";
+    ctx.beginPath();
+    ctx.moveTo(hx + side * 2, hy + 5);
+    ctx.quadraticCurveTo(hx + side * 5, hy + 2, hx + side * 8, hy + 5);
     ctx.stroke();
   }
 }

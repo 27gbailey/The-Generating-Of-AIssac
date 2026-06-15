@@ -1,7 +1,7 @@
 import { TILE_SIZE } from "./constants.js";
 import { circleHitsRoom } from "./roomSpace.js";
 
-export const TEAR_MAX_RANGE = TILE_SIZE * 3.5;
+export const TEAR_MAX_RANGE = TILE_SIZE * 5;
 export const TEAR_SPEED = 340;
 export const TEAR_RADIUS = 7;
 
