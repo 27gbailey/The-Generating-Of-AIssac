@@ -115,7 +115,7 @@ export function checkDoorTransition(player, room, gx, gy, dungeon) {
     { wall: "north", test: player.y - r <= 0, nx: gx, ny: gy - 1, entry: "south" },
     { wall: "south", test: player.y + r >= height, nx: gx, ny: gy + 1, entry: "north" },
     { wall: "west", test: player.x - r <= 0, nx: gx - 1, ny: gy, entry: "east" },
-    { wall: "east", test: player.x + r >= width, nx: gx, ny: gy, entry: "west" },
+    { wall: "east", test: player.x + r >= width, nx: gx + 1, ny: gy, entry: "west" },
   ];
 
   for (const check of checks) {
