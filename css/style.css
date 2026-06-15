@@ -1,0 +1,52 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background: #0a0806;
+  overflow: hidden;
+  font-family: "Segoe UI", system-ui, sans-serif;
+  color: #e8dcc8;
+}
+
+#game {
+  display: block;
+}
+
+#ui {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+#hud {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: min(90vw, 960px);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+#room-name {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+#controls {
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+#room-id {
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 11px;
+  opacity: 0.75;
+  word-break: break-all;
+}

@@ -1,0 +1,138 @@
+import {
+  DOOR_WALLS,
+  ROOM_HEIGHT,
+  ROOM_WIDTH,
+  TILE,
+  TILE_SIZE,
+  WALL_THICKNESS,
+} from "./constants.js";
+
+const DOOR_SPAN = TILE_SIZE * 2;
+
+export function getPlayAreaSize() {
+  return {
+    width: ROOM_WIDTH * TILE_SIZE,
+    height: ROOM_HEIGHT * TILE_SIZE,
+  };
+}
+
+export function getRoomScreenLayout(offsetX, offsetY) {
+  const width = ROOM_WIDTH * TILE_SIZE + WALL_THICKNESS * 2;
+  const height = ROOM_HEIGHT * TILE_SIZE + WALL_THICKNESS * 2;
+
+  return {
+    originX: offsetX - width / 2,
+    originY: offsetY - height / 2,
+    width,
+    height,
+    floorX: offsetX - (ROOM_WIDTH * TILE_SIZE) / 2,
+    floorY: offsetY - (ROOM_HEIGHT * TILE_SIZE) / 2,
+  };
+}
+
+export function playToScreen(x, y, layout) {
+  return {
+    x: layout.floorX + x,
+    y: layout.floorY + y,
+  };
+}
+
+function doorGapOnWall(wall, playWidth, playHeight) {
+  const centerX = playWidth / 2;
+  const centerY = playHeight / 2;
+  const half = DOOR_SPAN / 2;
+
+  switch (wall) {
+    case "north":
+    case "south":
+      return { axis: "x", min: centerX - half, max: centerX + half };
+    case "west":
+    case "east":
+      return { axis: "y", min: centerY - half, max: centerY + half };
+    default:
+      return null;
+  }
+}
+
+function isInDoorGap(wall, x, y, playWidth, playHeight) {
+  const gap = doorGapOnWall(wall, playWidth, playHeight);
+  if (!gap) return false;
+  const value = gap.axis === "x" ? x : y;
+  return value >= gap.min && value <= gap.max;
+}
+
+function isSolidTile(code) {
+  return code === TILE.WALL || code === TILE.ROCK;
+}
+
+export function getTileAtPlayPos(room, x, y) {
+  const tx = Math.floor(x / TILE_SIZE);
+  const ty = Math.floor(y / TILE_SIZE);
+  if (tx < 0 || ty < 0 || tx >= ROOM_WIDTH || ty >= ROOM_HEIGHT) return null;
+  return { code: room.grid[ty][tx], tx, ty };
+}
+
+function circleIntersectsTile(cx, cy, radius, tx, ty) {
+  const left = tx * TILE_SIZE;
+  const top = ty * TILE_SIZE;
+  const nearestX = Math.max(left, Math.min(cx, left + TILE_SIZE));
+  const nearestY = Math.max(top, Math.min(cy, top + TILE_SIZE));
+  const dx = cx - nearestX;
+  const dy = cy - nearestY;
+  return dx * dx + dy * dy < radius * radius;
+}
+
+export function circleHitsBoundary(cx, cy, radius, room) {
+  const { width, height } = getPlayAreaSize();
+
+  if (cx - radius < 0) {
+    if (!room.doors.west || !isInDoorGap("west", cx, cy, width, height)) return true;
+  }
+  if (cx + radius > width) {
+    if (!room.doors.east || !isInDoorGap("east", cx, cy, width, height)) return true;
+  }
+  if (cy - radius < 0) {
+    if (!room.doors.north || !isInDoorGap("north", cx, cy, width, height)) return true;
+  }
+  if (cy + radius > height) {
+    if (!room.doors.south || !isInDoorGap("south", cx, cy, width, height)) return true;
+  }
+
+  return false;
+}
+
+export function circleHitsRoom(cx, cy, radius, room) {
+  if (circleHitsBoundary(cx, cy, radius, room)) return true;
+
+  const { width, height } = getPlayAreaSize();
+  const minTx = Math.max(0, Math.floor((cx - radius) / TILE_SIZE));
+  const maxTx = Math.min(ROOM_WIDTH - 1, Math.floor((cx + radius) / TILE_SIZE));
+  const minTy = Math.max(0, Math.floor((cy - radius) / TILE_SIZE));
+  const maxTy = Math.min(ROOM_HEIGHT - 1, Math.floor((cy + radius) / TILE_SIZE));
+
+  for (let ty = minTy; ty <= maxTy; ty++) {
+    for (let tx = minTx; tx <= maxTx; tx++) {
+      const code = room.grid[ty][tx];
+      if (!isSolidTile(code)) continue;
+      if (circleIntersectsTile(cx, cy, radius, tx, ty)) return true;
+    }
+  }
+
+  return false;
+}
+
+export function getSpawnPosition(room) {
+  const { width, height } = getPlayAreaSize();
+  let x = width / 2;
+  let y = height / 2;
+
+  for (let i = 0; i < 24; i++) {
+    if (!circleHitsRoom(x, y, 14, room)) return { x, y };
+    x = width / 2 + (Math.random() - 0.5) * TILE_SIZE * 2;
+    y = height / 2 + (Math.random() - 0.5) * TILE_SIZE * 2;
+  }
+
+  return { x: width / 2, y: height / 2 };
+}
+
+export { DOOR_WALLS, WALL_THICKNESS };
