@@ -1,10 +1,16 @@
-import { decodeRoomId } from "./roomId.js";
-import { STARTER_ROOM_ID, getRoomCatalogEntry } from "./rooms.js";
+import { getRoomCatalogEntry } from "./rooms.js";
 import { drawRoom } from "./render.js";
 import { getRoomScreenLayout, getSpawnPosition } from "./roomSpace.js";
 import { createInputState, bindInput } from "./input.js";
 import { AIsaac } from "./player.js";
 import { TearBurst } from "./effects.js";
+import {
+  generateDungeon,
+  getCurrentRoomData,
+  checkDoorTransition,
+  entryPosition,
+} from "./dungeon.js";
+import { drawMinimap } from "./minimap.js";
 
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
@@ -14,14 +20,19 @@ const roomIdEl = document.getElementById("room-id");
 const input = createInputState();
 bindInput(input);
 
-const room = decodeRoomId(STARTER_ROOM_ID);
-const spawn = getSpawnPosition(room);
+const dungeon = generateDungeon();
+const start = getCurrentRoomData(dungeon, dungeon.start.gx, dungeon.start.gy);
+const spawn = getSpawnPosition(start.room);
 
 const game = {
-  room,
+  dungeon,
+  gx: dungeon.start.gx,
+  gy: dungeon.start.gy,
+  room: start.room,
   player: new AIsaac(spawn.x, spawn.y),
   tears: [],
   bursts: [],
+  transitionCooldown: 0,
 };
 
 let lastTime = performance.now();
@@ -32,14 +43,47 @@ function resize() {
 }
 
 function updateHud() {
-  const entry = getRoomCatalogEntry(game.room.roomId);
-  roomNameEl.textContent = entry?.name ?? "Unknown Room";
+  const entry = getRoomCatalogEntry();
+  roomNameEl.textContent = `${entry.name} (${game.gx}, ${game.gy})`;
   roomIdEl.textContent = game.room.roomId;
 }
 
+function changeRoom(transition) {
+  game.gx = transition.gx;
+  game.gy = transition.gy;
+  game.room = transition.room;
+  game.tears = [];
+  game.bursts = [];
+  game.transitionCooldown = 0.25;
+
+  const pos = entryPosition(transition.entry);
+  game.player.x = pos.x;
+  game.player.y = pos.y;
+  game.player.vx = 0;
+  game.player.vy = 0;
+
+  dungeon.visited.add(`${game.gx},${game.gy}`);
+  updateHud();
+}
+
 function update(dt) {
-  const tear = game.player.update(dt, input.keys, game.room);
-  if (tear) game.tears.push(tear);
+  if (game.transitionCooldown > 0) {
+    game.transitionCooldown -= dt;
+  } else {
+    const tear = game.player.update(dt, input.keys, game.room);
+    if (tear) game.tears.push(tear);
+
+    const transition = checkDoorTransition(
+      game.player,
+      game.room,
+      game.gx,
+      game.gy,
+      game.dungeon
+    );
+    if (transition) {
+      changeRoom(transition);
+    }
+  }
 
   for (const t of game.tears) {
     const burstPos = t.update(dt, game.room);
@@ -70,6 +114,7 @@ function draw() {
   }
 
   game.player.draw(ctx, layout);
+  drawMinimap(ctx, canvas, game.dungeon, game.gx, game.gy);
 }
 
 function loop(timestamp) {

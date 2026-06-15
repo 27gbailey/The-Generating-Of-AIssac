@@ -11,9 +11,9 @@ export class AIsaac {
     this.y = y;
     this.vx = 0;
     this.vy = 0;
-    this.radius = 24;
-    this.maxSpeed = 210;
-    this.acceleration = 980;
+    this.radius = 20;
+    this.maxSpeed = 255;
+    this.acceleration = 1150;
     this.friction = 9;
     this.bodyDir = { ...DEFAULT_BODY };
     this.headDir = { ...DEFAULT_HEAD };
@@ -35,7 +35,7 @@ export class AIsaac {
         this.facing = bodyVector.x >= 0 ? 1 : -1;
       }
       this.isWalking = true;
-      this.walkPhase += dt * 11;
+      this.walkPhase += dt * 12;
     } else {
       const damp = Math.exp(-this.friction * dt);
       this.vx *= damp;
@@ -96,16 +96,16 @@ export class AIsaac {
   draw(ctx, layout) {
     const screenX = layout.floorX + this.x;
     const screenY = layout.floorY + this.y;
-    const bob = this.isWalking ? Math.sin(this.walkPhase) * 3 : 0;
-    const legSwing = this.isWalking ? Math.sin(this.walkPhase) * 9 : 0;
-    const scale = 1.55;
+    const bob = this.isWalking ? Math.sin(this.walkPhase) * 2 : 0;
+    const legSwing = this.isWalking ? Math.sin(this.walkPhase) * 7 : 0;
+    const scale = 1.35;
 
     ctx.save();
     ctx.translate(screenX, screenY + bob);
     ctx.scale(this.facing * scale, scale);
 
-    this.drawLeg(ctx, -7, 14 + legSwing);
-    this.drawLeg(ctx, 7, 14 - legSwing);
+    this.drawLeg(ctx, -5, 10 + legSwing);
+    this.drawLeg(ctx, 5, 10 - legSwing);
     this.drawBody(ctx);
     this.drawHead(ctx);
 
@@ -113,39 +113,39 @@ export class AIsaac {
   }
 
   drawLeg(ctx, x, y) {
-    ctx.fillStyle = "#6a4a28";
-    ctx.strokeStyle = "#3d2814";
-    ctx.lineWidth = 2;
+    ctx.fillStyle = "#4a3828";
+    ctx.strokeStyle = "#2a2018";
+    ctx.lineWidth = 1.5;
     ctx.beginPath();
-    ctx.roundRect(x - 5, y - 2, 10, 14, 4);
+    ctx.roundRect(x - 3.5, y, 7, 11, 3);
     ctx.fill();
     ctx.stroke();
   }
 
   drawBody(ctx) {
-    ctx.fillStyle = "#c9956a";
-    ctx.strokeStyle = "#7a5428";
-    ctx.lineWidth = 2.5;
+    ctx.fillStyle = "#7fa8cc";
+    ctx.strokeStyle = "#4a6888";
+    ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.roundRect(-18, -6, 36, 28, 10);
+    ctx.roundRect(-11, 0, 22, 18, 6);
     ctx.fill();
     ctx.stroke();
 
-    ctx.fillStyle = "#a87848";
+    ctx.fillStyle = "#6a94b8";
     ctx.beginPath();
-    ctx.roundRect(-14, 2, 28, 16, 6);
+    ctx.roundRect(-8, 4, 16, 10, 4);
     ctx.fill();
   }
 
   drawHead(ctx) {
     const hx = this.headOffsetX();
-    const hy = -28 + this.headOffsetY();
+    const hy = -10 + this.headOffsetY();
 
     ctx.fillStyle = "#f5deb3";
     ctx.strokeStyle = "#8b6914";
-    ctx.lineWidth = 2.5;
+    ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.arc(hx, hy, 16, 0, Math.PI * 2);
+    ctx.arc(hx, hy, 11, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
 
@@ -153,12 +153,12 @@ export class AIsaac {
   }
 
   headOffsetX() {
-    if (this.headDir.x !== 0) return this.headDir.x * 5;
+    if (this.headDir.x !== 0) return this.headDir.x * 3;
     return 0;
   }
 
   headOffsetY() {
-    if (this.headDir.y !== 0) return this.headDir.y * 4;
+    if (this.headDir.y !== 0) return this.headDir.y * 2;
     return 0;
   }
 
@@ -167,12 +167,12 @@ export class AIsaac {
 
     if (this.headDir.y === -1) {
       ctx.beginPath();
-      ctx.arc(hx - 5, hy - 2, 3, 0, Math.PI * 2);
-      ctx.arc(hx + 5, hy - 2, 3, 0, Math.PI * 2);
+      ctx.arc(hx - 4, hy - 1, 2.5, 0, Math.PI * 2);
+      ctx.arc(hx + 4, hy - 1, 2.5, 0, Math.PI * 2);
       ctx.fill();
       ctx.fillStyle = "#c77";
       ctx.beginPath();
-      ctx.arc(hx, hy + 5, 3, 0, Math.PI);
+      ctx.arc(hx, hy + 4, 2.5, 0, Math.PI);
       ctx.fill();
       return;
     }
@@ -180,17 +180,17 @@ export class AIsaac {
     if (this.headDir.y === 1) {
       ctx.fillStyle = "#5a3a1a";
       ctx.beginPath();
-      ctx.arc(hx, hy + 2, 10, 0, Math.PI);
+      ctx.arc(hx, hy + 2, 7, 0, Math.PI);
       ctx.fill();
       return;
     }
 
-    const eyeX = this.headDir.x > 0 ? 4 : -4;
+    const eyeX = this.headDir.x > 0 ? 3 : -3;
     ctx.beginPath();
-    ctx.arc(hx + eyeX, hy - 2, 3.5, 0, Math.PI * 2);
+    ctx.arc(hx + eyeX, hy - 1, 2.5, 0, Math.PI * 2);
     ctx.fill();
     ctx.beginPath();
-    ctx.arc(hx + eyeX + 1, hy + 4, 2, 0, Math.PI * 2);
+    ctx.arc(hx + eyeX + 1, hy + 3, 1.5, 0, Math.PI * 2);
     ctx.fill();
   }
 }
