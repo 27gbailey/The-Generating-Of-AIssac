@@ -1,4 +1,6 @@
 import {
+  EXPLOSION_KNOCKBACK,
+  EXPLOSION_DAMAGE,
   EXPLOSION_RADIUS_X,
   EXPLOSION_RADIUS_Y,
   ROOM_HEIGHT,
@@ -7,6 +9,7 @@ import {
   TILE_SIZE,
 } from "./constants.js";
 import { destroyBarrelInstant, isBarrelSolid } from "./barrel.js";
+import { extinguishCampfireInExplosion } from "./campfire.js";
 import { destroyPoopInstant, destroyRock, isRockSolid } from "./destructibles.js";
 import { isPoopSolid } from "./poop.js";
 
@@ -74,6 +77,8 @@ export function destroyObjectsInExplosion(room, cx, cy, radiusX = EXPLOSION_RADI
         destroyPoopInstant(room, tx, ty);
       } else if (code === TILE.BARREL && isBarrelSolid(room, tx, ty)) {
         destroyBarrelInstant(room, tx, ty);
+      } else if (code === TILE.CAMPFIRE) {
+        extinguishCampfireInExplosion(room, tx, ty);
       }
     }
   }
@@ -134,6 +139,11 @@ export function applyExplosionKnockback(player, cx, cy, radiusX = EXPLOSION_RADI
   player.vy += ny * force * 0.55 - force * 0.42;
 }
 
+export function applyExplosionDamage(player, cx, cy, radiusX = EXPLOSION_RADIUS_X, radiusY = EXPLOSION_RADIUS_Y) {
+  if (!pointInExplosion(player.x, player.y, cx, cy, radiusX, radiusY)) return false;
+  return player.takeDamage(EXPLOSION_DAMAGE);
+}
+
 export function resolveExplosionChain(room, originX, originY, bombs, player, onBurst) {
   const queue = [{ x: originX, y: originY }];
   const seen = new Set();
@@ -147,6 +157,7 @@ export function resolveExplosionChain(room, originX, originY, bombs, player, onB
     const chains = collectChainDetonations(room, x, y, bombs);
     destroyObjectsInExplosion(room, x, y);
     applyExplosionKnockback(player, x, y);
+    applyExplosionDamage(player, x, y);
     onBurst(x, y);
 
     for (const next of chains) {

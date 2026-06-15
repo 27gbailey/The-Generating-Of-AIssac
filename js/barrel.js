@@ -5,10 +5,8 @@ import {
   TILE,
   TILE_SIZE,
 } from "./constants.js";
-import {
-  circleIntersectsObjectHitbox,
-  traceObjectVisual,
-} from "./objectHitbox.js";
+import { circleIntersectsObjectHitbox } from "./objectHitbox.js";
+import { drawBarrel3D } from "./objectDraw.js";
 
 export { objectHitbox as barrelHitbox } from "./objectHitbox.js";
 
@@ -78,68 +76,8 @@ export function barrelDamageStage(hits, destroyed) {
 }
 
 export function drawBarrel(ctx, px, py, hits, destroyed) {
-  if (destroyed) {
-    ctx.fillStyle = "rgba(40, 25, 12, 0.28)";
-    traceObjectVisual(ctx, px, py);
-    ctx.fill();
-    return;
-  }
-
   const stage = barrelDamageStage(hits, destroyed);
-  const bulge = stage * 0.8;
-  const { cx, cy, rx, ry } = traceObjectVisual(ctx, px + bulge, py + bulge);
-
-  ctx.save();
-
-  traceObjectVisual(ctx, px, py);
-  ctx.fillStyle = "#2a1808";
-  ctx.fill();
-
-  const bodyGrad = ctx.createLinearGradient(cx, cy - ry, cx, cy + ry);
-  bodyGrad.addColorStop(0, stage >= 2 ? "#7a5030" : stage >= 1 ? "#6a4020" : "#5a3818");
-  bodyGrad.addColorStop(0.5, "#4a3015");
-  bodyGrad.addColorStop(1, "#3a2510");
-  ctx.fillStyle = bodyGrad;
-  traceObjectVisual(ctx, px + bulge, py + bulge);
-  ctx.fill();
-
-  ctx.strokeStyle = "#2a1808";
-  ctx.lineWidth = 2;
-  traceObjectVisual(ctx, px + bulge, py + bulge);
-  ctx.stroke();
-
-  ctx.strokeStyle = "#8a6040";
-  ctx.lineWidth = 2.5;
-  for (const bandY of [cy - ry * 0.35, cy + ry * 0.2]) {
-    ctx.beginPath();
-    ctx.ellipse(cx, bandY, rx * 0.82, ry * 0.12, 0, 0, Math.PI * 2);
-    ctx.stroke();
-  }
-
-  ctx.fillStyle = stage >= 2 ? "#c02818" : "#8a1a12";
-  ctx.beginPath();
-  ctx.ellipse(cx, cy - ry * 0.72, rx * 0.28, ry * 0.14, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  if (stage >= 1) {
-    ctx.strokeStyle = "rgba(20, 10, 5, 0.75)";
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(cx - rx * 0.45, cy - ry * 0.1);
-    ctx.lineTo(cx - rx * 0.15, cy + ry * 0.35);
-    ctx.moveTo(cx + rx * 0.35, cy - ry * 0.25);
-    ctx.lineTo(cx + rx * 0.5, cy + ry * 0.2);
-    ctx.stroke();
-  }
-
-  if (stage >= 2) {
-    ctx.fillStyle = "rgba(255, 120, 40, 0.45)";
-    ctx.beginPath();
-    ctx.arc(cx + rx * 0.2, cy - ry * 0.08, rx * 0.14, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  ctx.restore();
+  drawBarrel3D(ctx, px, py, stage, destroyed);
 }
 
 export function barrelExplosionCenter(tx, ty) {

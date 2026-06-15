@@ -23,36 +23,63 @@ export class Chest {
       this.opened = true;
       return spillPickups(this.loot, this.x, this.y, this._rand);
     }
-    applyPlayerPushToCircle(player, this, 0.45, 0.1);
+    applyPlayerPushToCircle(player, this, 0.4, 0.08);
     resolveCircleCollisions(this, entities, 0.65);
     moveCircle(this, dt, room, entities, Math.exp(-12 * dt));
     return [];
   }
 
   tryOpen(player) {
-    return Math.hypot(this.x - player.x, this.y - player.y) < this.radius + player.radius - 2;
+    return Math.hypot(this.x - player.x, this.y - player.y) < this.radius + player.radius + 4;
   }
 
   draw(ctx, layout) {
     const sx = layout.floorX + this.x;
     const sy = layout.floorY + this.y;
-    const w = this.radius * 1.55;
-    const h = this.radius * 1.25;
+    const w = this.radius * 1.65;
+    const h = this.radius * 1.35;
+
     ctx.save();
+
+    ctx.fillStyle = "rgba(20, 12, 8, 0.35)";
+    ctx.beginPath();
+    ctx.ellipse(sx, sy + h * 0.45, w * 0.55, h * 0.2, 0, 0, Math.PI * 2);
+    ctx.fill();
+
     ctx.fillStyle = this.opened ? "#6a4828" : "#5a3818";
     ctx.strokeStyle = "#2a1808";
-    ctx.lineWidth = 2;
-    ctx.fillRect(sx - w / 2, sy - h * 0.15, w, h * 0.85);
-    ctx.strokeRect(sx - w / 2, sy - h * 0.15, w, h * 0.85);
-    if (!this.opened) {
+    ctx.lineWidth = 2.5;
+    ctx.fillRect(sx - w / 2, sy - h * 0.12, w, h * 0.88);
+    ctx.strokeRect(sx - w / 2, sy - h * 0.12, w, h * 0.88);
+
+    if (this.opened) {
+      ctx.fillStyle = "#4a3015";
+      ctx.fillRect(sx - w / 2 + 4, sy - h * 0.55, w - 8, h * 0.45);
+      ctx.fillStyle = "rgba(10, 8, 6, 0.6)";
+      ctx.fillRect(sx - w / 2 + 6, sy - h * 0.02, w - 12, h * 0.58);
+    } else {
+      ctx.fillStyle = "#7a5530";
+      ctx.fillRect(sx - w / 2 + 4, sy - h * 0.48, w - 8, h * 0.38);
       ctx.fillStyle = "#c8a030";
       ctx.beginPath();
-      ctx.arc(sx, sy + h * 0.08, 3.5, 0, Math.PI * 2);
+      ctx.arc(sx, sy + h * 0.1, 5, 0, Math.PI * 2);
       ctx.fill();
-    } else {
-      ctx.fillStyle = "rgba(10,8,6,0.55)";
-      ctx.fillRect(sx - w / 2 + 5, sy - h * 0.05, w - 10, h * 0.55);
+      ctx.strokeStyle = "#6a5010";
+      ctx.stroke();
     }
+
+    ctx.strokeStyle = "#8a6040";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(sx - w / 2 + 6, sy + h * 0.22);
+    ctx.lineTo(sx + w / 2 - 6, sy + h * 0.22);
+    ctx.stroke();
+
+    ctx.fillStyle = "#e8dcc8";
+    ctx.font = "bold 10px system-ui,sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(this.opened ? "OPEN" : "CHEST", sx, sy - h * 0.62);
+
     ctx.restore();
   }
 }

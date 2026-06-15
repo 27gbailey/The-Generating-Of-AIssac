@@ -8,8 +8,9 @@ export function createRoomAmbience(gx, gy, dungeonSeed) {
   const seed = hash(gx, gy, dungeonSeed);
   const dust = [];
   const lights = [];
+  const rays = [];
 
-  for (let i = 0; i < 10; i++) {
+  for (let i = 0; i < 12; i++) {
     const h = hash(i, seed, 91);
     const angle = ((h % 628) / 100);
     dust.push({
@@ -35,7 +36,19 @@ export function createRoomAmbience(gx, gy, dungeonSeed) {
     });
   }
 
-  return { dust, lights, time: 0, seed };
+  for (let i = 0; i < 3; i++) {
+    const h = hash(i + 60, seed, 53);
+    rays.push({
+      x: 0.15 + ((h % 700) / 1000) * 0.7,
+      angle: -0.35 + ((h >> 6) % 100) / 200,
+      width: 0.06 + (h % 40) / 400,
+      length: 0.55 + ((h >> 4) % 100) / 200,
+      alpha: 0.06 + (h % 25) / 350,
+      pulse: ((h >> 2) % 100) / 100,
+    });
+  }
+
+  return { dust, lights, rays, time: 0, seed };
 }
 
 export function updateRoomAmbience(ambience, dt) {
@@ -59,13 +72,58 @@ export function updateRoomAmbience(ambience, dt) {
   }
 }
 
+function drawLightRay(ctx, ray, ambience, floorX, floorY, floorW, floorH) {
+  const pulse = 0.8 + Math.sin(ambience.time * 0.45 + ray.pulse * Math.PI * 2) * 0.2;
+  const originX = floorX + ray.x * floorW;
+  const originY = floorY - 8;
+  const len = ray.length * floorH * pulse;
+  const halfW = ray.width * floorW * 0.5;
+
+  ctx.save();
+  ctx.translate(originX, originY);
+  ctx.rotate(ray.angle);
+
+  const grad = ctx.createLinearGradient(0, 0, 0, len);
+  grad.addColorStop(0, `rgba(255, 248, 210, ${ray.alpha * pulse + 0.04})`);
+  grad.addColorStop(0.35, `rgba(255, 230, 160, ${ray.alpha * pulse * 0.6})`);
+  grad.addColorStop(1, "rgba(255, 220, 140, 0)");
+
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.moveTo(-halfW, 0);
+  ctx.lineTo(halfW, 0);
+  ctx.lineTo(halfW * 0.35, len);
+  ctx.lineTo(-halfW * 0.35, len);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
 export function drawRoomAmbience(ctx, ambience, floorX, floorY, floorW, floorH) {
   ctx.save();
   ctx.beginPath();
   ctx.rect(floorX, floorY, floorW, floorH);
   ctx.clip();
 
+  const vignette = ctx.createRadialGradient(
+    floorX + floorW / 2,
+    floorY + floorH / 2,
+    floorW * 0.15,
+    floorX + floorW / 2,
+    floorY + floorH / 2,
+    floorW * 0.72
+  );
+  vignette.addColorStop(0, "rgba(0, 0, 0, 0)");
+  vignette.addColorStop(0.65, "rgba(0, 0, 0, 0.06)");
+  vignette.addColorStop(1, "rgba(0, 0, 0, 0.22)");
+  ctx.fillStyle = vignette;
+  ctx.fillRect(floorX, floorY, floorW, floorH);
+
   ctx.globalCompositeOperation = "screen";
+
+  for (const ray of ambience.rays) {
+    drawLightRay(ctx, ray, ambience, floorX, floorY, floorW, floorH);
+  }
 
   for (const light of ambience.lights) {
     const pulse = 0.85 + Math.sin(ambience.time * 0.6 + light.pulse * Math.PI * 2) * 0.15;
@@ -93,7 +151,7 @@ export function drawRoomAmbience(ctx, ambience, floorX, floorY, floorW, floorH) 
 
   for (const speck of ambience.dust) {
     const twinkle = 0.75 + Math.sin(ambience.time * 1.4 + speck.twinkle * 12) * 0.25;
-    const alpha = 0.04 * twinkle;
+    const alpha = 0.05 * twinkle;
     const px = floorX + speck.x * floorW;
     const py = floorY + speck.y * floorH;
     ctx.fillStyle = `rgba(230, 220, 200, ${alpha})`;

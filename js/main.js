@@ -16,6 +16,9 @@ import {
 import { drawMinimap } from "./minimap.js";
 import { initStatsHud, updateRoomHud, updateStatsHud } from "./hud.js";
 import { collectPushableEntities } from "./pushablePhysics.js";
+import { checkCampfireBurn } from "./campfire.js";
+import { CAMPFIRE_DAMAGE } from "./constants.js";
+import { sfx } from "./audio.js";
 
 function syncRoomEntities(cell) {
   game.chest = cell?.chest ?? null;
@@ -32,16 +35,19 @@ function updateChestsAndPickups(dt) {
   });
 
   if (game.chest) {
+    const wasClosed = !game.chest.opened;
     const spilled = game.chest.update(dt, game.room, game.player, pushables);
+    if (wasClosed && game.chest.opened) sfx.chestOpen();
     if (spilled.length) game.pickups.push(...spilled);
   }
 
   let statsChanged = false;
   for (const pickup of game.pickups) {
     const key = pickup.update(dt, game.room, game.player, pushables);
-    if (key && cell?.collectedPickups) {
-      cell.collectedPickups.add(key);
+    if (key !== null) {
+      if (cell?.collectedPickups) cell.collectedPickups.add(key);
       statsChanged = true;
+      sfx.pickup();
     }
   }
 
@@ -98,6 +104,7 @@ function boot() {
     bursts: [],
     bombCooldown: 0,
     roomTransition: null,
+    worldTime: 0,
   };
 
   updateHud();
@@ -127,6 +134,7 @@ function roomDrawOptions(gx, gy) {
     cellKey: `${gx},${gy}`,
     dungeonSeed: game.dungeon.seed,
     isBoss: cell?.isBoss ?? false,
+    time: game.worldTime,
   };
 }
 
@@ -137,14 +145,19 @@ function tryPlaceBombFromInput() {
   if (bomb) {
     game.bombs.push(bomb);
     game.bombCooldown = BOMB_PLACE_COOLDOWN;
+    sfx.bombPlace();
     updateStatsHud(game.player.stats);
   }
 }
 
 function triggerExplosion(x, y) {
+  const healthBefore = game.player.stats.health;
   resolveExplosionChain(game.room, x, y, game.bombs, game.player, (bx, by) => {
     game.bursts.push(new BombExplosion(bx, by, EXPLOSION_RADIUS_X, EXPLOSION_RADIUS_Y));
+    sfx.explosion();
   });
+  if (game.player.stats.health < healthBefore) sfx.hurt();
+  updateStatsHud(game.player.stats);
 }
 
 function updateBombs(dt) {
@@ -205,6 +218,7 @@ function update(dt) {
   if (!game) return;
 
   if (game.roomTransition) {
+    game.worldTime += dt;
     game.roomTransition.progress = Math.min(
       1,
       game.roomTransition.progress + dt / game.roomTransition.duration
@@ -228,12 +242,23 @@ function update(dt) {
 
   if (game.bombCooldown > 0) game.bombCooldown -= dt;
 
+  game.worldTime += dt;
   tickRoomAmbience(`${game.gx},${game.gy}`, dt, game.dungeon.seed);
 
   tryPlaceBombFromInput();
 
   const tear = game.player.update(dt, input.keys, game.room);
-  if (tear) game.tears.push(tear);
+  if (tear) {
+    game.tears.push(tear);
+    sfx.shoot();
+  }
+
+  if (checkCampfireBurn(game.player, game.room)) {
+    if (game.player.takeDamage(CAMPFIRE_DAMAGE)) {
+      sfx.fireBurn();
+      updateStatsHud(game.player.stats);
+    }
+  }
 
   updateBombs(dt);
   updateChestsAndPickups(dt);
@@ -246,6 +271,7 @@ function update(dt) {
     game.dungeon
   );
   if (transition) {
+    sfx.door();
     beginRoomTransition(transition);
     clearInputFrame(input);
     return;
@@ -259,8 +285,22 @@ function update(dt) {
         game.bursts.push(new TearBurst(burstPos.x, burstPos.y));
       } else if (burstPos.poop) {
         game.bursts.push(new PoopSplatter(burstPos.x, burstPos.y));
+        sfx.tearPoop();
+      } else if (burstPos.campfire) {
+        game.bursts.push(new TearBurst(burstPos.x, burstPos.y));
+        if (burstPos.extinguished) sfx.extinguish();
+        else sfx.tearCampfire();
+      } else if (burstPos.barrel) {
+        game.bursts.push(new TearBurst(burstPos.x, burstPos.y));
+        sfx.tearBarrel();
+      } else if (burstPos.wall) {
+        game.bursts.push(new TearBurst(burstPos.x, burstPos.y));
+        sfx.tearHit();
+      } else if (burstPos.fizzle) {
+        sfx.tearHit();
       } else {
         game.bursts.push(new TearBurst(burstPos.x, burstPos.y));
+        sfx.tearHit();
       }
     }
   }

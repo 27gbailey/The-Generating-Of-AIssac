@@ -10,7 +10,8 @@ import { doorSegment } from "./doors.js";
 import { isRockSolid } from "./destructibles.js";
 import { drawBarrel } from "./barrel.js";
 import { drawPoop } from "./poop.js";
-import { traceRockVisual } from "./objectHitbox.js";
+import { drawCampfire } from "./campfire.js";
+import { drawRock3D } from "./objectDraw.js";
 import {
   createRoomAmbience,
   drawRoomAmbience,
@@ -18,7 +19,7 @@ import {
 } from "./roomAmbience.js";
 
 const TILE_COLORS = {
-  [TILE.FLOOR]: "#b5a690",
+  [TILE.FLOOR]: "#8f8170",
   [TILE.WALL]: "#1a1410",
   [TILE.ROCK]: "#7a7a7a",
   [TILE.BLOOD]: "#5a1a1a",
@@ -28,7 +29,7 @@ const WALL_TOP = "#2e241c";
 const WALL_FACE = "#15100c";
 const DOOR_FRAME = "#4a3428";
 const DOOR_INNER = "#2a1f18";
-const GRID_LINE = "rgba(255, 255, 255, 0.05)";
+const GRID_LINE = "rgba(255, 255, 255, 0.04)";
 
 const ambienceCache = new Map();
 
@@ -50,23 +51,16 @@ function getAmbience(cellKey, dungeonSeed) {
 export function tickRoomAmbience(cellKey, dt, dungeonSeed) {
   const ambience = getAmbience(cellKey, dungeonSeed);
   updateRoomAmbience(ambience, dt);
+  return ambience.time;
 }
 
-function drawRock(ctx, px, py) {
-  traceRockVisual(ctx, px, py);
-  ctx.fillStyle = TILE_COLORS[TILE.ROCK];
-  ctx.fill();
+function drawFloorTile(ctx, px, py) {
+  ctx.fillStyle = TILE_COLORS[TILE.FLOOR];
+  ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
 
-  const { cx, cy, rx } = traceRockVisual(ctx, px, py);
-  ctx.fillStyle = "rgba(255,255,255,0.1)";
-  ctx.beginPath();
-  ctx.ellipse(cx - rx * 0.2, cy - rx * 0.25, rx * 0.28, rx * 0.18, -0.3, 0, Math.PI * 2);
-  ctx.fill();
-
-  traceRockVisual(ctx, px, py);
-  ctx.strokeStyle = "rgba(0,0,0,0.25)";
-  ctx.lineWidth = 1.5;
-  ctx.stroke();
+  const shade = ((px + py) % (TILE_SIZE * 2)) / (TILE_SIZE * 4);
+  ctx.fillStyle = `rgba(0, 0, 0, ${0.04 + shade * 0.03})`;
+  ctx.fillRect(px + 1, py + 1, TILE_SIZE - 2, TILE_SIZE - 2);
 }
 
 function textureBand(ctx, x, y, w, h, horizontal, wallSide) {
@@ -208,12 +202,18 @@ export function drawRoom(ctx, room, offsetX, offsetY, options = {}) {
   const floorY = originY + WALL_THICKNESS;
   const floorW = ROOM_WIDTH * TILE_SIZE;
   const floorH = ROOM_HEIGHT * TILE_SIZE;
+  const time = options.time ?? 0;
 
   ctx.fillStyle = "#120e0c";
   ctx.fillRect(originX, originY, width, height);
 
-  ctx.fillStyle = TILE_COLORS[TILE.FLOOR];
-  ctx.fillRect(floorX, floorY, floorW, floorH);
+  for (let y = 0; y < ROOM_HEIGHT; y++) {
+    for (let x = 0; x < ROOM_WIDTH; x++) {
+      const px = floorX + x * TILE_SIZE;
+      const py = floorY + y * TILE_SIZE;
+      drawFloorTile(ctx, px, py);
+    }
+  }
 
   for (let y = 0; y < ROOM_HEIGHT; y++) {
     for (let x = 0; x < ROOM_WIDTH; x++) {
@@ -230,7 +230,7 @@ export function drawRoom(ctx, room, offsetX, offsetY, options = {}) {
         ctx.fill();
       } else if (code === TILE.ROCK) {
         if (isRockSolid(room, x, y)) {
-          drawRock(ctx, px, py);
+          drawRock3D(ctx, px, py);
         }
       } else if (code === TILE.POOP) {
         const state = room.poopStates?.[`${x},${y}`] ?? { hits: 0, destroyed: false };
@@ -238,6 +238,9 @@ export function drawRoom(ctx, room, offsetX, offsetY, options = {}) {
       } else if (code === TILE.BARREL) {
         const state = room.barrelStates?.[`${x},${y}`] ?? { hits: 0, destroyed: false };
         drawBarrel(ctx, px, py, state.hits, state.destroyed);
+      } else if (code === TILE.CAMPFIRE) {
+        const state = room.campfireStates?.[`${x},${y}`] ?? { hits: 0, extinguished: false };
+        drawCampfire(ctx, px, py, state.hits, state.extinguished, time);
       } else if (code !== TILE.FLOOR) {
         ctx.fillStyle = TILE_COLORS[code] ?? "#ff00ff";
         ctx.fillRect(px + 4, py + 4, TILE_SIZE - 8, TILE_SIZE - 8);

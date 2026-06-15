@@ -1,5 +1,6 @@
 import {
   PICKUP_BOMB_RADIUS,
+  PICKUP_COLLECT_EXTRA,
   PICKUP_FULL_HEART_RADIUS,
   PICKUP_HALF_HEART_RADIUS,
   PICKUP_KEY_RADIUS,
@@ -44,6 +45,19 @@ export function applyPickupToStats(type, stats) {
   return true;
 }
 
+function drawHeartShape(ctx, sx, sy, size, fill, half = false) {
+  ctx.fillStyle = fill;
+  ctx.beginPath();
+  ctx.moveTo(sx, sy + size * 0.35);
+  ctx.bezierCurveTo(sx - size, sy - size * 0.2, sx - size * 0.55, sy - size * 0.75, sx, sy - size * 0.15);
+  ctx.bezierCurveTo(sx + size * 0.55, sy - size * 0.75, sx + size, sy - size * 0.2, sx, sy + size * 0.35);
+  ctx.fill();
+  if (half) {
+    ctx.fillStyle = "#0a0806";
+    ctx.fillRect(sx, sy - size, size, size * 2.2);
+  }
+}
+
 export class Pickup {
   constructor(type, x, y, vx = 0, vy = 0, tilePos = null) {
     this.type = type;
@@ -51,7 +65,7 @@ export class Pickup {
     this.y = y;
     this.vx = vx;
     this.vy = vy;
-    this.radius = TYPE_RADIUS[type] ?? 10;
+    this.radius = TYPE_RADIUS[type] ?? 12;
     this.dead = false;
     this.bobPhase = Math.random() * Math.PI * 2;
     this.tilePos = tilePos;
@@ -65,23 +79,26 @@ export class Pickup {
     return this.type === "half_heart" || this.type === "full_heart";
   }
 
+  collectionRadius(player) {
+    return this.radius + player.radius + PICKUP_COLLECT_EXTRA;
+  }
+
   update(dt, room, player, entities) {
     if (this.dead) return null;
 
     const collectedKey = this.tryCollect(player);
     if (collectedKey !== null) return collectedKey;
 
-    applyPlayerPushToCircle(player, this, 0.5, 0.28);
+    applyPlayerPushToCircle(player, this, 0.35, 0.18);
     resolveCircleCollisions(this, entities, 0.5);
     moveCircle(this, dt, room, entities, Math.exp(-6 * dt));
     this.bobPhase += dt * 5;
     return null;
   }
 
-  /** Returns collection key if collected, null if not collected (including pushable hearts at full HP). */
   tryCollect(player) {
     const dist = Math.hypot(this.x - player.x, this.y - player.y);
-    if (dist >= this.radius + player.radius - 5) return null;
+    if (dist >= this.collectionRadius(player)) return null;
 
     if (this.isHeart()) {
       if (!canCollectHeart(player.stats, this.type)) return null;
@@ -97,58 +114,86 @@ export class Pickup {
   draw(ctx, layout) {
     if (this.dead) return;
     const sx = layout.floorX + this.x;
-    const sy = layout.floorY + this.y + Math.sin(this.bobPhase) * 1.5;
+    const sy = layout.floorY + this.y + Math.sin(this.bobPhase) * 2;
+    const r = this.radius;
+
     ctx.save();
+    ctx.fillStyle = "rgba(0,0,0,0.25)";
+    ctx.beginPath();
+    ctx.ellipse(sx, sy + r * 0.55, r * 0.85, r * 0.28, 0, 0, Math.PI * 2);
+    ctx.fill();
 
     if (this.type === "penny") {
-      ctx.fillStyle = "#c8a020";
-      ctx.strokeStyle = "#6a5010";
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.arc(sx, sy, this.radius, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-      ctx.fillStyle = "#5a4010";
-      ctx.font = "bold 11px system-ui,sans-serif";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText("¢", sx, sy + 0.5);
-    } else if (this.type === "key") {
-      ctx.fillStyle = "#d8c878";
-      ctx.beginPath();
-      ctx.arc(sx - 2, sy - 1, this.radius * 0.55, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = "#8a7840";
+      const grad = ctx.createRadialGradient(sx - 2, sy - 2, 1, sx, sy, r);
+      grad.addColorStop(0, "#ffe066");
+      grad.addColorStop(0.6, "#d4a017");
+      grad.addColorStop(1, "#8a6010");
+      ctx.fillStyle = grad;
+      ctx.strokeStyle = "#5a4010";
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.moveTo(sx + 1, sy);
-      ctx.lineTo(sx + this.radius + 2, sy);
+      ctx.arc(sx, sy, r, 0, Math.PI * 2);
+      ctx.fill();
       ctx.stroke();
+      ctx.fillStyle = "#3a2808";
+      ctx.font = "bold 14px system-ui,sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("1¢", sx, sy + 0.5);
+    } else if (this.type === "key") {
+      ctx.fillStyle = "#f0d860";
+      ctx.strokeStyle = "#8a7020";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(sx - r * 0.35, sy - r * 0.05, r * 0.55, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = "#c8a830";
+      ctx.fillRect(sx - r * 0.05, sy - r * 0.12, r * 1.1, r * 0.22);
+      ctx.fillRect(sx + r * 0.45, sy - r * 0.05, r * 0.18, r * 0.55);
+      ctx.fillRect(sx + r * 0.65, sy + r * 0.15, r * 0.18, r * 0.35);
+      ctx.fillStyle = "#3a2808";
+      ctx.font = "bold 9px system-ui,sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("KEY", sx, sy + r * 0.75);
     } else if (this.type === "bomb") {
-      ctx.fillStyle = "#3a3028";
+      ctx.fillStyle = "#2a2218";
       ctx.beginPath();
-      ctx.arc(sx, sy, this.radius, 0, Math.PI * 2);
+      ctx.arc(sx, sy + r * 0.1, r * 0.85, 0, Math.PI * 2);
       ctx.fill();
-      ctx.fillStyle = "#f84";
+      ctx.strokeStyle = "#1a1008";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.strokeStyle = "#666";
+      ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.arc(sx + 2, sy - this.radius - 3, 2.5, 0, Math.PI * 2);
+      ctx.moveTo(sx, sy - r * 0.5);
+      ctx.lineTo(sx + 3, sy - r * 1.1);
+      ctx.stroke();
+      ctx.fillStyle = "#ff6622";
+      ctx.beginPath();
+      ctx.arc(sx + 3, sy - r * 1.15, 3.5, 0, Math.PI * 2);
       ctx.fill();
+      ctx.fillStyle = "#ddd";
+      ctx.font = "bold 9px system-ui,sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("BOMB", sx, sy + r * 0.85);
     } else if (this.type === "half_heart") {
-      ctx.fillStyle = "#d63b3b";
-      ctx.beginPath();
-      ctx.moveTo(sx, sy + this.radius * 0.35);
-      ctx.bezierCurveTo(sx - this.radius, sy - this.radius * 0.2, sx - this.radius * 0.55, sy - this.radius * 0.75, sx, sy - this.radius * 0.15);
-      ctx.bezierCurveTo(sx + this.radius * 0.55, sy - this.radius * 0.75, sx + this.radius, sy - this.radius * 0.2, sx, sy + this.radius * 0.35);
-      ctx.fill();
-      ctx.fillStyle = "#0a0806";
-      ctx.fillRect(sx, sy - this.radius, this.radius, this.radius * 2.2);
+      drawHeartShape(ctx, sx, sy, r, "#e84040", true);
+      ctx.fillStyle = "#fff";
+      ctx.font = "bold 8px system-ui,sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("+½", sx, sy + r * 0.95);
     } else if (this.type === "full_heart") {
-      ctx.fillStyle = "#e84848";
+      drawHeartShape(ctx, sx, sy, r * 1.05, "#ff5050", false);
+      ctx.fillStyle = "rgba(255,255,255,0.35)";
       ctx.beginPath();
-      ctx.moveTo(sx, sy + this.radius * 0.45);
-      ctx.bezierCurveTo(sx - this.radius * 1.1, sy - this.radius * 0.15, sx - this.radius * 0.65, sy - this.radius * 0.95, sx, sy - this.radius * 0.2);
-      ctx.bezierCurveTo(sx + this.radius * 0.65, sy - this.radius * 0.95, sx + this.radius * 1.1, sy - this.radius * 0.15, sx, sy + this.radius * 0.45);
+      ctx.arc(sx - r * 0.25, sy - r * 0.2, r * 0.18, 0, Math.PI * 2);
       ctx.fill();
+      ctx.fillStyle = "#fff";
+      ctx.font = "bold 8px system-ui,sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("+2", sx, sy + r * 0.95);
     }
 
     ctx.restore();

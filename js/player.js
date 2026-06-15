@@ -3,6 +3,9 @@ import { getBodyVector, getHeadVector } from "./input.js";
 import { spawnTear } from "./tear.js";
 import { createPlayerStats } from "./stats.js";
 
+import { damage } from "./stats.js";
+import { INVINCIBILITY_DURATION } from "./constants.js";
+
 const DEFAULT_BODY = { x: 0, y: 1 };
 const DEFAULT_HEAD = { x: 0, y: -1 };
 
@@ -24,9 +27,11 @@ export class AIsaac {
     this.shootCooldown = 0;
     this.shootRate = 0.32;
     this.stats = createPlayerStats();
+    this.invincibleTime = 0;
   }
 
   update(dt, keys, room) {
+    if (this.invincibleTime > 0) this.invincibleTime -= dt;
     const bodyVector = getBodyVector(keys);
 
     if (bodyVector) {
@@ -89,6 +94,17 @@ export class AIsaac {
     }
   }
 
+  canTakeDamage() {
+    return this.invincibleTime <= 0;
+  }
+
+  takeDamage(amount) {
+    if (!this.canTakeDamage()) return false;
+    damage(this.stats, amount);
+    this.invincibleTime = INVINCIBILITY_DURATION;
+    return true;
+  }
+
   tryShoot() {
     if (this.shootCooldown > 0) return null;
     this.shootCooldown = this.shootRate;
@@ -105,6 +121,10 @@ export class AIsaac {
     ctx.save();
     ctx.translate(screenX, screenY + bob);
     ctx.scale(this.facing * scale, scale);
+
+    if (this.invincibleTime > 0 && Math.floor(this.invincibleTime * 14) % 2 === 0) {
+      ctx.globalAlpha = 0.45;
+    }
 
     this.drawLeg(ctx, -5, 10 + legSwing);
     this.drawLeg(ctx, 5, 10 - legSwing);

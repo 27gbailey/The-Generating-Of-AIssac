@@ -27,6 +27,8 @@ export function createInputState() {
 }
 
 export function bindInput(input) {
+  const unlock = () => import("./audio.js").then(({ unlockAudio }) => unlockAudio());
+
   window.addEventListener("keydown", (e) => {
     const key = KEY_MAP[e.key.toLowerCase()];
     if (!key) return;
@@ -35,7 +37,10 @@ export function bindInput(input) {
       input.justPressed.add(key);
     }
     input.keys.add(key);
+    unlock();
   });
+
+  window.addEventListener("pointerdown", () => unlock());
 
   window.addEventListener("keyup", (e) => {
     const key = KEY_MAP[e.key.toLowerCase()];

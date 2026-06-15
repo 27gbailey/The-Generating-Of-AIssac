@@ -15,6 +15,7 @@ export const TILE = {
   BLOOD: "03",
   POOP: "04",
   BARREL: "05",
+  CAMPFIRE: "06",
 };
 
 export const DOOR_WALLS = ["north", "east", "south", "west"];
@@ -51,12 +52,19 @@ export const START_BOMBS = 1;
 
 export const BARREL_HITS_TO_DESTROY = 3;
 
-export const PICKUP_PENNY_RADIUS = 9;
-export const PICKUP_KEY_RADIUS = 11;
-export const PICKUP_BOMB_RADIUS = 10;
-export const PICKUP_HALF_HEART_RADIUS = 10;
-export const PICKUP_FULL_HEART_RADIUS = 11;
-export const CHEST_RADIUS = 22;
+export const CAMPFIRE_HITS_TO_EXTINGUISH = 8;
+export const CAMPFIRE_DAMAGE = 1;
+
+export const PICKUP_PENNY_RADIUS = 12;
+export const PICKUP_KEY_RADIUS = 13;
+export const PICKUP_BOMB_RADIUS = 12;
+export const PICKUP_HALF_HEART_RADIUS = 13;
+export const PICKUP_FULL_HEART_RADIUS = 14;
+export const PICKUP_COLLECT_EXTRA = 14;
+export const CHEST_RADIUS = 28;
+
+export const EXPLOSION_DAMAGE = 2;
+export const INVINCIBILITY_DURATION = 0.5;
 
 export const DIRECTIONS = {
   north: { dx: 0, dy: -1, opposite: "south" },

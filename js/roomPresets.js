@@ -24,17 +24,53 @@ function normalizePickups(raw = []) {
   });
 }
 
-function buildLayout({ rocks = [], poops = [], blood = [], barrels = [], pickups = [] } = {}) {
+function buildLayout({ rocks = [], poops = [], blood = [], barrels = [], campfires = [], pickups = [], skipPerimeter = false } = {}) {
   const grid = createEmptyGrid();
   for (const [x, y] of rocks) place(grid, x, y, TILE.ROCK);
   for (const [x, y] of poops) place(grid, x, y, TILE.POOP);
   for (const [x, y] of blood) place(grid, x, y, TILE.BLOOD);
   for (const [x, y] of barrels) place(grid, x, y, TILE.BARREL);
+  for (const [x, y] of campfires) place(grid, x, y, TILE.CAMPFIRE);
+  if (!skipPerimeter) applyPerimeterRing(grid);
   return { grid, pickups: normalizePickups(pickups) };
 }
 
+const DOOR_TILES = new Set(
+  DOOR_CLEARANCE.north
+    .concat(DOOR_CLEARANCE.south, DOOR_CLEARANCE.west, DOOR_CLEARANCE.east)
+    .map(({ x, y }) => `${x},${y}`)
+);
+
+function isDoorTile(x, y) {
+  return DOOR_TILES.has(`${x},${y}`);
+}
+
+function perimeterTiles() {
+  const tiles = [];
+  for (let x = 1; x < ROOM_WIDTH - 1; x++) {
+    tiles.push([x, 1], [x, ROOM_HEIGHT - 2]);
+  }
+  for (let y = 1; y < ROOM_HEIGHT - 1; y++) {
+    tiles.push([1, y], [ROOM_WIDTH - 2, y]);
+  }
+  return tiles;
+}
+
+/** Sparse accents on the outer ring so rooms don't feel hollow at the edges. */
+function applyPerimeterRing(grid) {
+  for (const [x, y] of perimeterTiles()) {
+    if (isDoorTile(x, y)) continue;
+    if (grid[y][x] !== TILE.FLOOR) continue;
+    const hash = (x * 17 + y * 31) % 10;
+    if (hash === 0 || hash === 1) place(grid, x, y, TILE.ROCK);
+    else if (hash === 2) place(grid, x, y, TILE.POOP);
+    else if (hash === 3) place(grid, x, y, TILE.BARREL);
+    else if (hash === 4) place(grid, x, y, TILE.CAMPFIRE);
+  }
+}
+
 const PRESET_LAYOUTS = {
-  empty: {},
+  empty: { skipPerimeter: true },
 
   // Rock-focused layouts
   single_center: { rocks: [[6, 3]] },
@@ -305,6 +341,19 @@ const PRESET_LAYOUTS = {
     poops: [[5, 3], [6, 3], [7, 3], [5, 2], [7, 4]],
   },
 
+  campfire_center: { campfires: [[6, 3]] },
+  campfire_north: { campfires: [[6, 1]], rocks: [[5, 2], [7, 2]] },
+  twin_campfires: { campfires: [[4, 3], [8, 3]] },
+  campfire_puzzle: {
+    campfires: [[6, 3]],
+    barrels: [[5, 3], [7, 3]],
+    rocks: [[6, 2]],
+  },
+  fire_ring: {
+    campfires: [[5, 2], [7, 2], [5, 4], [7, 4]],
+    rocks: [[6, 3]],
+  },
+
   boss_chamber: {
     blood: [
       [1, 0], [2, 0], [10, 0], [11, 0], [0, 1], [12, 1],
@@ -420,6 +469,7 @@ export function buildRoomFromPreset(presetId, doors) {
     poopStates: null,
     destroyedRocks: null,
     barrelStates: null,
+    campfireStates: null,
   };
 }
 

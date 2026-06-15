@@ -14,6 +14,7 @@ import { isInDoorGap } from "./doors.js";
 import { initPoopStates } from "./poop.js";
 import { initDestroyedRocks } from "./destructibles.js";
 import { initBarrelStates } from "./barrel.js";
+import { initCampfireStates } from "./campfire.js";
 import { spawnChestsInDungeon } from "./chestSpawner.js";
 import { createPickupsFromLayout } from "./pickup.js";
 
@@ -247,6 +248,9 @@ export function generateDungeon(seed = Date.now()) {
     if (!cell.barrelStates) {
       cell.barrelStates = initBarrelStates(built.grid);
     }
+    if (!cell.campfireStates) {
+      cell.campfireStates = initCampfireStates(built.grid);
+    }
     if (!cell.bombs) {
       cell.bombs = [];
     }
@@ -254,12 +258,14 @@ export function generateDungeon(seed = Date.now()) {
     built.poopStates = cell.poopStates;
     built.destroyedRocks = cell.destroyedRocks;
     built.barrelStates = cell.barrelStates;
+    built.campfireStates = cell.campfireStates;
     rooms[`${cell.gx},${cell.gy}`] = {
       ...cell,
       doors,
       poopStates: cell.poopStates,
       destroyedRocks: cell.destroyedRocks,
       barrelStates: cell.barrelStates,
+      campfireStates: cell.campfireStates,
       bombs: cell.bombs,
       pickups: cell.pickups,
       collectedPickups: cell.collectedPickups,

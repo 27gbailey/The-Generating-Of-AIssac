@@ -1,5 +1,6 @@
 import { TILE_SIZE } from "./constants.js";
 import { barrelExplosionCenter, damageBarrel, findBarrelHit } from "./barrel.js";
+import { damageCampfire, findCampfireHit } from "./campfire.js";
 import { circleHitsRoom, findPoopHit } from "./roomSpace.js";
 import { damagePoop } from "./poop.js";
 
@@ -43,9 +44,19 @@ export class Tear {
       return { x: this.x, y: this.y, poop: true };
     }
 
+    const campfireHit = findCampfireHit(nextX, nextY, this.radius, room);
+    if (campfireHit) {
+      const state = room.campfireStates?.[campfireHit.key];
+      const wasExtinguished = state?.extinguished;
+      damageCampfire(room, campfireHit.key);
+      this.state = "dead";
+      const extinguished = !wasExtinguished && state?.extinguished;
+      return { x: this.x, y: this.y, campfire: true, extinguished };
+    }
+
     if (circleHitsRoom(nextX, nextY, this.radius, room)) {
       this.state = "dead";
-      return { x: this.x, y: this.y };
+      return { x: this.x, y: this.y, wall: true };
     }
 
     this.x = nextX;
@@ -54,7 +65,7 @@ export class Tear {
 
     if (this.distance >= this.maxRange) {
       this.state = "dead";
-      return { x: this.x, y: this.y };
+      return { x: this.x, y: this.y, fizzle: true };
     }
 
     return null;
