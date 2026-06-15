@@ -2,10 +2,10 @@ import {
   DIRECTIONS,
   DOOR_WALLS,
   FLOOR_GRID_SIZE,
-  TILE_SIZE,
 } from "./constants.js";
 import { DEFAULT_PRESET, buildRoomFromPreset } from "./rooms.js";
 import { getPlayAreaSize } from "./roomSpace.js";
+import { isInDoorGap } from "./doors.js";
 
 function mulberry32(seed) {
   return function rand() {
@@ -35,35 +35,63 @@ function doorsForCell(cells, gx, gy) {
   return doors;
 }
 
+function neighborCount(cells, gx, gy) {
+  let count = 0;
+  for (const wall of DOOR_WALLS) {
+    const { dx, dy } = DIRECTIONS[wall];
+    if (cells[`${gx + dx},${gy + dy}`]) count++;
+  }
+  return count;
+}
+
+function expandableDirections(cells, gx, gy, rand) {
+  const options = [];
+  for (const wall of shuffle(DOOR_WALLS, rand)) {
+    const { dx, dy } = DIRECTIONS[wall];
+    const nx = gx + dx;
+    const ny = gy + dy;
+    if (nx < 0 || ny < 0 || nx >= FLOOR_GRID_SIZE || ny >= FLOOR_GRID_SIZE) continue;
+    if (cells[`${nx},${ny}`]) continue;
+    options.push({ wall, nx, ny });
+  }
+  return options;
+}
+
+function pickExpansionCell(cells, rand) {
+  const occupied = Object.values(cells);
+  const deadEnds = occupied.filter((cell) => neighborCount(cells, cell.gx, cell.gy) === 1);
+  const branchPoints = occupied.filter((cell) => {
+    const count = neighborCount(cells, cell.gx, cell.gy);
+    return count >= 1 && count < 4 && expandableDirections(cells, cell.gx, cell.gy, rand).length > 0;
+  });
+
+  if (deadEnds.length > 0 && rand() < 0.72) {
+    return deadEnds[Math.floor(rand() * deadEnds.length)];
+  }
+  if (branchPoints.length > 0) {
+    return branchPoints[Math.floor(rand() * branchPoints.length)];
+  }
+  return occupied[Math.floor(rand() * occupied.length)];
+}
+
 export function generateDungeon(seed = Date.now()) {
   const rand = mulberry32(seed);
   const cells = {};
   const startX = Math.floor(FLOOR_GRID_SIZE / 2);
   const startY = Math.floor(FLOOR_GRID_SIZE / 2);
-  const queue = [`${startX},${startY}`];
   cells[`${startX},${startY}`] = { gx: startX, gy: startY, isStart: true };
 
   const targetRooms = 8 + Math.floor(rand() * 8);
 
-  while (queue.length > 0 && Object.keys(cells).length < targetRooms) {
-    const key = queue.splice(Math.floor(rand() * queue.length), 1)[0];
-    const [gx, gy] = key.split(",").map(Number);
-    const options = shuffle(DOOR_WALLS, rand);
+  let attempts = 0;
+  while (Object.keys(cells).length < targetRooms && attempts < 500) {
+    attempts++;
+    const cell = pickExpansionCell(cells, rand);
+    const options = expandableDirections(cells, cell.gx, cell.gy, rand);
+    if (options.length === 0) continue;
 
-    for (const wall of options) {
-      if (Object.keys(cells).length >= targetRooms) break;
-
-      const { dx, dy } = DIRECTIONS[wall];
-      const nx = gx + dx;
-      const ny = gy + dy;
-      if (nx < 0 || ny < 0 || nx >= FLOOR_GRID_SIZE || ny >= FLOOR_GRID_SIZE) continue;
-
-      const nKey = `${nx},${ny}`;
-      if (cells[nKey]) continue;
-
-      cells[nKey] = { gx: nx, gy: ny, isStart: false };
-      queue.push(nKey);
-    }
+    const pick = options[0];
+    cells[`${pick.nx},${pick.ny}`] = { gx: pick.nx, gy: pick.ny, isStart: false };
   }
 
   const rooms = {};
@@ -89,21 +117,8 @@ export function getCurrentRoomData(dungeon, gx, gy) {
   return dungeon.rooms[`${gx},${gy}`] ?? null;
 }
 
-function inDoorGap(wall, x, y, width, height) {
-  const centerX = width / 2;
-  const centerY = height / 2;
-  const half = TILE_SIZE;
-
-  switch (wall) {
-    case "north":
-    case "south":
-      return x >= centerX - half && x <= centerX + half;
-    case "west":
-    case "east":
-      return y >= centerY - half && y <= centerY + half;
-    default:
-      return false;
-  }
+function inDoorGapForTransition(wall, x, y, width, height) {
+  return isInDoorGap(wall, x, y, width, height);
 }
 
 export function checkDoorTransition(player, room, gx, gy, dungeon) {
@@ -119,7 +134,7 @@ export function checkDoorTransition(player, room, gx, gy, dungeon) {
 
   for (const check of checks) {
     if (!room.doors[check.wall] || !check.test) continue;
-    if (!inDoorGap(check.wall, player.x, player.y, width, height)) continue;
+    if (!inDoorGapForTransition(check.wall, player.x, player.y, width, height)) continue;
 
     const next = getCurrentRoomData(dungeon, check.nx, check.ny);
     if (!next) continue;

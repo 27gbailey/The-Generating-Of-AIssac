@@ -113,8 +113,8 @@ export class AIsaac {
   }
 
   drawLeg(ctx, x, y) {
-    ctx.fillStyle = "#4a3828";
-    ctx.strokeStyle = "#2a2018";
+    ctx.fillStyle = "#c9956a";
+    ctx.strokeStyle = "#8b6914";
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.rect(x - 3.5, y, 7, 11);
@@ -123,29 +123,24 @@ export class AIsaac {
   }
 
   drawBody(ctx) {
-    ctx.fillStyle = "#7fa8cc";
-    ctx.strokeStyle = "#4a6888";
+    ctx.fillStyle = "#e8c49a";
+    ctx.strokeStyle = "#9a7348";
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.rect(-11, 0, 22, 18);
+    ctx.rect(-10, 2, 20, 16);
     ctx.fill();
     ctx.stroke();
-
-    ctx.fillStyle = "#6a94b8";
-    ctx.beginPath();
-    ctx.rect(-8, 4, 16, 10);
-    ctx.fill();
   }
 
   drawHead(ctx) {
     const hx = this.headOffsetX();
-    const hy = -10 + this.headOffsetY();
+    const hy = -8 + this.headOffsetY();
 
     ctx.fillStyle = "#f5deb3";
     ctx.strokeStyle = "#8b6914";
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.arc(hx, hy, 11, 0, Math.PI * 2);
+    ctx.arc(hx, hy, 15, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
 
@@ -163,34 +158,49 @@ export class AIsaac {
   }
 
   drawFace(ctx, hx, hy) {
-    ctx.fillStyle = "#222";
-
     if (this.headDir.y === -1) {
-      ctx.beginPath();
-      ctx.arc(hx - 4, hy - 1, 2.5, 0, Math.PI * 2);
-      ctx.arc(hx + 4, hy - 1, 2.5, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = "#c77";
-      ctx.beginPath();
-      ctx.arc(hx, hy + 4, 2.5, 0, Math.PI);
-      ctx.fill();
+      this.drawSadEyesFront(ctx, hx, hy);
+      this.drawFrown(ctx, hx, hy + 5, 0);
       return;
     }
 
     if (this.headDir.y === 1) {
       ctx.fillStyle = "#5a3a1a";
       ctx.beginPath();
-      ctx.arc(hx, hy + 2, 7, 0, Math.PI);
+      ctx.arc(hx, hy + 3, 9, 0, Math.PI);
       ctx.fill();
       return;
     }
 
-    const eyeX = this.headDir.x > 0 ? 3 : -3;
+    const side = this.headDir.x > 0 ? 1 : -1;
+    ctx.fillStyle = "#222";
     ctx.beginPath();
-    ctx.arc(hx + eyeX, hy - 1, 2.5, 0, Math.PI * 2);
+    ctx.arc(hx + side * 4, hy - 1, 3, 0, Math.PI * 2);
     ctx.fill();
+    this.drawFrown(ctx, hx + side * 3, hy + 5, side * 0.4);
+  }
+
+  drawSadEyesFront(ctx, hx, hy) {
+    ctx.strokeStyle = "#222";
+    ctx.lineWidth = 2;
+    ctx.lineCap = "round";
+
     ctx.beginPath();
-    ctx.arc(hx + eyeX + 1, hy + 3, 1.5, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.arc(hx - 5, hy - 1, 3, Math.PI * 0.1, Math.PI * 0.9);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(hx + 5, hy - 1, 3, Math.PI * 0.1, Math.PI * 0.9);
+    ctx.stroke();
+  }
+
+  drawFrown(ctx, hx, hy, tilt) {
+    ctx.strokeStyle = "#6a4a4a";
+    ctx.lineWidth = 2;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(hx - 4 + tilt, hy);
+    ctx.quadraticCurveTo(hx + tilt, hy + 3, hx + 4 + tilt, hy);
+    ctx.stroke();
   }
 }

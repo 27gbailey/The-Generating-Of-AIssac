@@ -6,6 +6,7 @@ import {
   TILE_SIZE,
   WALL_THICKNESS,
 } from "./constants.js";
+import { doorSegment } from "./doors.js";
 
 const TILE_COLORS = {
   [TILE.FLOOR]: "#3d2f24",
@@ -24,32 +25,8 @@ function roomPixelSize() {
   };
 }
 
-function doorSegment(wall, doors) {
-  const center = WALL_THICKNESS + (ROOM_WIDTH * TILE_SIZE) / 2;
-  const span = TILE_SIZE * 2;
-
-  switch (wall) {
-    case "north":
-      return { x: center - span / 2, y: 0, w: span, h: WALL_THICKNESS };
-    case "south":
-      return {
-        x: center - span / 2,
-        y: WALL_THICKNESS + ROOM_HEIGHT * TILE_SIZE,
-        w: span,
-        h: WALL_THICKNESS,
-      };
-    case "west":
-      return { x: 0, y: center - span / 2, w: WALL_THICKNESS, h: span };
-    case "east":
-      return {
-        x: WALL_THICKNESS + ROOM_WIDTH * TILE_SIZE,
-        y: center - span / 2,
-        w: WALL_THICKNESS,
-        h: span,
-      };
-    default:
-      return null;
-  }
+function doorSegmentForWall(wall) {
+  return doorSegment(wall);
 }
 
 export function drawRoom(ctx, room, offsetX, offsetY) {
@@ -89,7 +66,7 @@ export function drawRoom(ctx, room, offsetX, offsetY) {
 
   for (const wall of DOOR_WALLS) {
     if (!room.doors[wall]) continue;
-    const segment = doorSegment(wall, room.doors);
+    const segment = doorSegmentForWall(wall);
     if (!segment) continue;
 
     ctx.fillStyle = DOOR_COLOR;

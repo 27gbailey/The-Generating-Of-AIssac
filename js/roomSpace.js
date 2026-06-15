@@ -6,8 +6,7 @@ import {
   TILE_SIZE,
   WALL_THICKNESS,
 } from "./constants.js";
-
-const DOOR_SPAN = TILE_SIZE * 2;
+import { isInDoorGap } from "./doors.js";
 
 export function getPlayAreaSize() {
   return {
@@ -37,29 +36,6 @@ export function playToScreen(x, y, layout) {
   };
 }
 
-function doorGapOnWall(wall, playWidth, playHeight) {
-  const centerX = playWidth / 2;
-  const centerY = playHeight / 2;
-  const half = DOOR_SPAN / 2;
-
-  switch (wall) {
-    case "north":
-    case "south":
-      return { axis: "x", min: centerX - half, max: centerX + half };
-    case "west":
-    case "east":
-      return { axis: "y", min: centerY - half, max: centerY + half };
-    default:
-      return null;
-  }
-}
-
-function isInDoorGap(wall, x, y, playWidth, playHeight) {
-  const gap = doorGapOnWall(wall, playWidth, playHeight);
-  if (!gap) return false;
-  const value = gap.axis === "x" ? x : y;
-  return value >= gap.min && value <= gap.max;
-}
 
 function isSolidTile(code) {
   return code === TILE.WALL || code === TILE.ROCK;
