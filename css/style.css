@@ -39,6 +39,11 @@ body {
   letter-spacing: 0.04em;
 }
 
+#controls {
+  font-size: 12px;
+  opacity: 0.8;
+}
+
 #room-id {
   font-family: "SFMono-Regular", Consolas, monospace;
   font-size: 11px;
