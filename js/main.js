@@ -4,8 +4,9 @@ import { getRoomScreenLayout, getSpawnPosition } from "./roomSpace.js";
 import { createInputState, bindInput, clearInputFrame } from "./input.js";
 import { AIsaac } from "./player.js";
 import { TearBurst, PoopSplatter, BombExplosion } from "./effects.js";
-import { applyExplosion, tryPlaceBomb } from "./bomb.js";
-import { BOMB_PLACE_COOLDOWN } from "./constants.js";
+import { tryPlaceBomb } from "./bomb.js";
+import { BOMB_PLACE_COOLDOWN, EXPLOSION_RADIUS_X, EXPLOSION_RADIUS_Y } from "./constants.js";
+import { resolveExplosionChain } from "./explosion.js";
 import {
   generateDungeon,
   getCurrentRoomData,
@@ -100,14 +101,19 @@ function tryPlaceBombFromInput() {
   }
 }
 
+function triggerExplosion(x, y) {
+  resolveExplosionChain(game.room, x, y, game.bombs, game.player, (bx, by) => {
+    game.bursts.push(new BombExplosion(bx, by, EXPLOSION_RADIUS_X, EXPLOSION_RADIUS_Y));
+  });
+}
+
 function updateBombs(dt) {
   const liveBombs = game.bombs.filter((b) => b.alive);
 
   for (const bomb of liveBombs) {
     const blast = bomb.update(dt, game.room, game.player, liveBombs);
     if (blast) {
-      applyExplosion(game.room, blast.x, blast.y, blast.radius);
-      game.bursts.push(new BombExplosion(blast.x, blast.y, blast.radius));
+      triggerExplosion(blast.x, blast.y);
     }
   }
 
@@ -202,7 +208,10 @@ function update(dt) {
   for (const t of game.tears) {
     const burstPos = t.update(dt, game.room);
     if (burstPos) {
-      if (burstPos.poop) {
+      if (burstPos.barrelExplosion) {
+        triggerExplosion(burstPos.barrelExplosion.x, burstPos.barrelExplosion.y);
+        game.bursts.push(new TearBurst(burstPos.x, burstPos.y));
+      } else if (burstPos.poop) {
         game.bursts.push(new PoopSplatter(burstPos.x, burstPos.y));
       } else {
         game.bursts.push(new TearBurst(burstPos.x, burstPos.y));

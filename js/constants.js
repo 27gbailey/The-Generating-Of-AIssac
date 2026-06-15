@@ -14,6 +14,7 @@ export const TILE = {
   ROCK: "02",
   BLOOD: "03",
   POOP: "04",
+  BARREL: "05",
 };
 
 export const DOOR_WALLS = ["north", "east", "south", "west"];
@@ -33,9 +34,16 @@ export const POOP_HITS_TO_DESTROY = 4;
 
 export const BOMB_RADIUS = 14;
 export const BOMB_FUSE = 2.6;
-export const BOMB_EXPLOSION_RADIUS = 50;
 export const BOMB_MAX_PER_ROOM = 3;
 export const BOMB_PLACE_COOLDOWN = 0.45;
+
+export const EXPLOSION_RADIUS_X = 64;
+export const EXPLOSION_RADIUS_Y = 38;
+export const EXPLOSION_KNOCKBACK = 480;
+
+export const BARREL_HITBOX_INSET = 3;
+export const BARREL_HITBOX_RADIUS = 5;
+export const BARREL_HITS_TO_DESTROY = 3;
 
 export const DIRECTIONS = {
   north: { dx: 0, dy: -1, opposite: "south" },
@@ -51,4 +59,4 @@ export const DOOR_CLEARANCE = {
   east: [{ x: 12, y: 2 }, { x: 12, y: 3 }],
 };
 
-export const BLOCKING_TILES = new Set([TILE.ROCK, TILE.WALL, TILE.POOP]);
+export const BLOCKING_TILES = new Set([TILE.ROCK, TILE.WALL, TILE.POOP, TILE.BARREL]);

@@ -118,16 +118,38 @@ export class PoopSplatter {
 }
 
 export class BombExplosion {
-  constructor(x, y, radius) {
+  constructor(x, y, radiusX, radiusY) {
     this.x = x;
     this.y = y;
-    this.radius = radius;
-    this.life = 0.35;
-    this.maxLife = 0.35;
+    this.radiusX = radiusX;
+    this.radiusY = radiusY;
+    this.life = 0.38;
+    this.maxLife = 0.38;
+    this.particles = [];
+
+    for (let i = 0; i < 16; i++) {
+      const angle = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI * 1.1;
+      const speed = 90 + Math.random() * 160;
+      this.particles.push({
+        x: 0,
+        y: 0,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        size: 4 + Math.random() * 8,
+      });
+    }
   }
 
   update(dt) {
     this.life -= dt;
+    for (const p of this.particles) {
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.vy -= 220 * dt;
+      p.vx *= 0.94;
+      p.vy *= 0.94;
+      p.size *= 0.96;
+    }
   }
 
   draw(ctx, layout) {
@@ -136,18 +158,30 @@ export class BombExplosion {
     const sx = layout.floorX + this.x;
     const sy = layout.floorY + this.y;
     const t = 1 - this.life / this.maxLife;
-    const r = this.radius * (0.4 + t * 0.85);
-    const alpha = (1 - t) * 0.75;
+    const alpha = (1 - t) * 0.8;
+    const rx = this.radiusX * (0.35 + t * 0.95);
+    const ry = this.radiusY * (0.25 + t * 0.85);
 
     ctx.save();
-    const grad = ctx.createRadialGradient(sx, sy, 0, sx, sy, r);
-    grad.addColorStop(0, `rgba(255, 220, 120, ${alpha})`);
-    grad.addColorStop(0.45, `rgba(255, 120, 40, ${alpha * 0.65})`);
-    grad.addColorStop(1, "rgba(80, 30, 10, 0)");
+
+    const grad = ctx.createRadialGradient(sx, sy + ry * 0.15, 0, sx, sy, rx);
+    grad.addColorStop(0, `rgba(255, 230, 140, ${alpha * 0.9})`);
+    grad.addColorStop(0.35, `rgba(255, 130, 45, ${alpha * 0.55})`);
+    grad.addColorStop(0.7, `rgba(180, 50, 15, ${alpha * 0.2})`);
+    grad.addColorStop(1, "rgba(60, 20, 5, 0)");
     ctx.fillStyle = grad;
     ctx.beginPath();
-    ctx.arc(sx, sy, r, 0, Math.PI * 2);
+    ctx.ellipse(sx, sy, rx, ry, 0, 0, Math.PI * 2);
     ctx.fill();
+
+    ctx.globalCompositeOperation = "lighter";
+    for (const p of this.particles) {
+      ctx.fillStyle = `rgba(255, ${160 + Math.floor(Math.random() * 60)}, 60, ${alpha * 0.7})`;
+      ctx.beginPath();
+      ctx.ellipse(sx + p.x, sy + p.y, p.size, p.size * 0.65, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
     ctx.restore();
   }
 

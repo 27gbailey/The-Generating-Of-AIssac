@@ -13,6 +13,7 @@ import { getPlayAreaSize } from "./roomSpace.js";
 import { isInDoorGap } from "./doors.js";
 import { initPoopStates } from "./poop.js";
 import { initDestroyedRocks } from "./destructibles.js";
+import { initBarrelStates } from "./barrel.js";
 
 function mulberry32(seed) {
   return function rand() {
@@ -236,16 +237,21 @@ export function generateDungeon(seed = Date.now()) {
     if (!cell.destroyedRocks) {
       cell.destroyedRocks = initDestroyedRocks(built.grid);
     }
+    if (!cell.barrelStates) {
+      cell.barrelStates = initBarrelStates(built.grid);
+    }
     if (!cell.bombs) {
       cell.bombs = [];
     }
     built.poopStates = cell.poopStates;
     built.destroyedRocks = cell.destroyedRocks;
+    built.barrelStates = cell.barrelStates;
     rooms[`${cell.gx},${cell.gy}`] = {
       ...cell,
       doors,
       poopStates: cell.poopStates,
       destroyedRocks: cell.destroyedRocks,
+      barrelStates: cell.barrelStates,
       bombs: cell.bombs,
       room: built,
     };

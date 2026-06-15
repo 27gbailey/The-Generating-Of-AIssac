@@ -14,11 +14,12 @@ function place(grid, x, y, code) {
   }
 }
 
-function buildLayout({ rocks = [], poops = [], blood = [] } = {}) {
+function buildLayout({ rocks = [], poops = [], blood = [], barrels = [] } = {}) {
   const grid = createEmptyGrid();
   for (const [x, y] of rocks) place(grid, x, y, TILE.ROCK);
   for (const [x, y] of poops) place(grid, x, y, TILE.POOP);
   for (const [x, y] of blood) place(grid, x, y, TILE.BLOOD);
+  for (const [x, y] of barrels) place(grid, x, y, TILE.BARREL);
   return grid;
 }
 
@@ -72,14 +73,17 @@ const PRESET_LAYOUTS = {
   poop_gate: {
     rocks: [[4, 2], [8, 2], [4, 4], [8, 4]],
     poops: [[6, 3]],
+    barrels: [[3, 3], [9, 3]],
   },
   poop_guards: {
     rocks: [[3, 2], [3, 4], [9, 2], [9, 4]],
     poops: [[6, 3]],
+    barrels: [[6, 1]],
   },
   poop_bridge: {
     rocks: [[2, 2], [10, 4]],
     poops: [[5, 3], [6, 3], [7, 3]],
+    barrels: [[6, 5]],
   },
   poop_alley: {
     rocks: [[2, 2], [2, 4], [10, 2], [10, 4]],
@@ -88,35 +92,47 @@ const PRESET_LAYOUTS = {
   poop_teeth: {
     rocks: [[4, 2], [8, 2], [4, 4], [8, 4]],
     poops: [[5, 3], [7, 3]],
+    barrels: [[6, 3]],
   },
   poop_flank: {
     rocks: [[6, 3]],
     poops: [[3, 2], [3, 4], [9, 2], [9, 4]],
+    barrels: [[2, 3], [10, 3]],
   },
   poop_islands: {
     rocks: [[4, 2], [8, 4]],
     poops: [[3, 4], [9, 2], [6, 3]],
+    barrels: [[6, 5]],
   },
   poop_pillars: {
     rocks: [[3, 2], [9, 2], [3, 4], [9, 4]],
     poops: [[6, 3]],
+    barrels: [[1, 3], [11, 3]],
   },
   blocked_pass: {
     rocks: [[5, 2], [7, 2], [5, 4], [7, 4], [4, 3], [8, 3]],
     poops: [[6, 3]],
+    barrels: [[6, 1]],
   },
   rock_poop_split: {
     rocks: [[3, 2], [3, 4], [9, 2], [9, 4]],
     poops: [[6, 1], [6, 5]],
+    barrels: [[6, 3]],
   },
   poop_cluster: {
     poops: [[5, 2], [6, 2], [7, 2], [6, 3], [6, 4]],
     rocks: [[2, 3], [10, 3]],
+    barrels: [[4, 4], [8, 4]],
   },
   poop_steps: {
     poops: [[3, 4], [5, 3], [7, 2], [9, 3]],
     rocks: [[6, 5], [2, 2]],
+    barrels: [[8, 5]],
   },
+  barrel_pair: { barrels: [[4, 3], [8, 3]] },
+  barrel_corner: { barrels: [[2, 1], [10, 5], [6, 3]] },
+  barrel_wall: { barrels: [[3, 2], [5, 2], [7, 2], [9, 2]] },
+  barrel_rock_mix: { rocks: [[6, 3]], barrels: [[3, 3], [9, 3]] },
 
   boss_chamber: {
     blood: [
@@ -129,6 +145,7 @@ const PRESET_LAYOUTS = {
     ],
     rocks: [[6, 3]],
     poops: [[4, 3], [8, 3]],
+    barrels: [[2, 4], [10, 4]],
   },
 };
 
@@ -225,6 +242,7 @@ export function buildRoomFromPreset(presetId, doors) {
     blockedWalls: getBlockedWalls(room.grid),
     poopStates: null,
     destroyedRocks: null,
+    barrelStates: null,
   };
 }
 

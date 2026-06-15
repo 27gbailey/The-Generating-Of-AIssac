@@ -1,4 +1,5 @@
 import { TILE_SIZE } from "./constants.js";
+import { barrelExplosionCenter, damageBarrel, findBarrelHit } from "./barrel.js";
 import { circleHitsRoom, findPoopHit } from "./roomSpace.js";
 import { damagePoop } from "./poop.js";
 
@@ -23,6 +24,17 @@ export class Tear {
 
     const nextX = this.x + this.vx * dt;
     const nextY = this.y + this.vy * dt;
+
+    const barrelHit = findBarrelHit(nextX, nextY, this.radius, room);
+    if (barrelHit) {
+      const result = damageBarrel(room, barrelHit.key);
+      this.state = "dead";
+      if (result === "explode") {
+        const center = barrelExplosionCenter(barrelHit.tx, barrelHit.ty);
+        return { x: this.x, y: this.y, barrelExplosion: center };
+      }
+      return { x: this.x, y: this.y, barrel: true };
+    }
 
     const poopHit = findPoopHit(nextX, nextY, this.radius, room);
     if (poopHit) {

@@ -97,10 +97,10 @@ export function drawPoop(ctx, px, py, hits, destroyed) {
 
   const stage = poopDamageStage(hits, destroyed);
   const cx = px + TILE_SIZE * 0.5;
-  const cy = py + TILE_SIZE * 0.58;
-  const shrink = stage * 3;
-  const baseW = 26 - shrink;
-  const baseH = 18 - shrink * 0.7;
+  const cy = py + TILE_SIZE * 0.56;
+  const shrink = stage * 2;
+  const baseW = 34 - shrink;
+  const baseH = 24 - shrink * 0.65;
 
   ctx.save();
 

@@ -1,11 +1,9 @@
 import {
-  BOMB_EXPLOSION_RADIUS,
   BOMB_FUSE,
   BOMB_MAX_PER_ROOM,
   BOMB_RADIUS,
 } from "./constants.js";
-import { destroyObjectsInRadius } from "./destructibles.js";
-import { circleHitsRoom } from "./roomSpace.js";
+import { circleHitsRoom, circleHitsRoomExcluding } from "./roomSpace.js";
 
 export class Bomb {
   constructor(x, y) {
@@ -24,7 +22,7 @@ export class Bomb {
     this.fuse -= dt;
     if (this.fuse <= 0) {
       this.alive = false;
-      return { x: this.x, y: this.y, radius: BOMB_EXPLOSION_RADIUS };
+      return { x: this.x, y: this.y };
     }
 
     this.applyPlayerPush(player);
@@ -154,22 +152,46 @@ export class Bomb {
   }
 }
 
+function bombPlacementCandidates(player) {
+  const points = [{ x: player.x, y: player.y }];
+  for (let i = 0; i < 8; i++) {
+    const angle = (Math.PI * 2 * i) / 8;
+    for (const dist of [5, 10, 16]) {
+      points.push({
+        x: player.x + Math.cos(angle) * dist,
+        y: player.y + Math.sin(angle) * dist,
+      });
+    }
+  }
+  return points;
+}
+
+function canPlaceBombAt(x, y, room, bombs, player) {
+  const checkR = BOMB_RADIUS - 2;
+  if (
+    circleHitsRoom(x, y, checkR, room) &&
+    circleHitsRoomExcluding(x, y, checkR, room, player.x, player.y, player.radius + 1)
+  ) {
+    return false;
+  }
+
+  for (const bomb of bombs) {
+    if (!bomb.alive) continue;
+    if (Math.hypot(x - bomb.x, y - bomb.y) < BOMB_RADIUS * 1.75) return false;
+  }
+
+  return true;
+}
+
 export function tryPlaceBomb(player, room, bombs) {
   const live = bombs.filter((b) => b.alive);
   if (live.length >= BOMB_MAX_PER_ROOM) return null;
 
-  const x = player.x + player.bodyDir.x * (player.radius + BOMB_RADIUS + 4);
-  const y = player.y + player.bodyDir.y * (player.radius + BOMB_RADIUS + 4);
-
-  if (circleHitsRoom(x, y, BOMB_RADIUS, room)) return null;
-
-  for (const bomb of live) {
-    if (Math.hypot(x - bomb.x, y - bomb.y) < BOMB_RADIUS * 2) return null;
+  for (const point of bombPlacementCandidates(player)) {
+    if (canPlaceBombAt(point.x, point.y, room, live, player)) {
+      return new Bomb(point.x, point.y);
+    }
   }
 
-  return new Bomb(x, y);
-}
-
-export function applyExplosion(room, x, y, radius) {
-  destroyObjectsInRadius(room, x, y, radius);
+  return null;
 }
