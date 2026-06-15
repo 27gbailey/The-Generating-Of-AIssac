@@ -2,12 +2,13 @@ import { circleHitsRoom } from "./roomSpace.js";
 import { getBodyVector, getHeadVector } from "./input.js";
 import { spawnTear } from "./tear.js";
 import { createPlayerStats } from "./stats.js";
-
 import { damage } from "./stats.js";
-import { INVINCIBILITY_DURATION } from "./constants.js";
+import { INVINCIBILITY_DURATION, BODY_RADIUS, HEAD_RADIUS } from "./constants.js";
 
 const DEFAULT_BODY = { x: 0, y: 1 };
 const DEFAULT_HEAD = { x: 0, y: -1 };
+
+export { BODY_RADIUS, HEAD_RADIUS };
 
 export class AIsaac {
   constructor(x, y) {
@@ -15,7 +16,8 @@ export class AIsaac {
     this.y = y;
     this.vx = 0;
     this.vy = 0;
-    this.radius = 20;
+    this.bodyRadius = BODY_RADIUS;
+    this.radius = BODY_RADIUS;
     this.maxSpeed = 255;
     this.acceleration = 1150;
     this.friction = 9;
@@ -28,9 +30,29 @@ export class AIsaac {
     this.shootRate = 0.32;
     this.stats = createPlayerStats();
     this.invincibleTime = 0;
+    this.deathState = null;
+  }
+
+  get isDying() {
+    return this.deathState !== null;
+  }
+
+  get isDead() {
+    return this.deathState?.phase === "done";
+  }
+
+  headPosition() {
+    const hx = this.headDir.x * 3;
+    const hy = -14 + this.headDir.y * 2;
+    return { x: this.x + hx * this.facing, y: this.y + hy };
   }
 
   update(dt, keys, room) {
+    if (this.deathState) {
+      this.updateDeath(dt);
+      return null;
+    }
+
     if (this.invincibleTime > 0) this.invincibleTime -= dt;
     const bodyVector = getBodyVector(keys);
 
@@ -75,18 +97,19 @@ export class AIsaac {
   moveWithCollision(dt, room) {
     const steps = 3;
     const stepDt = dt / steps;
+    const r = this.bodyRadius;
 
     for (let i = 0; i < steps; i++) {
       const nextX = this.x + this.vx * stepDt;
       const nextY = this.y + this.vy * stepDt;
 
-      if (!circleHitsRoom(nextX, this.y, this.radius, room)) {
+      if (!circleHitsRoom(nextX, this.y, r, room)) {
         this.x = nextX;
       } else {
         this.vx = 0;
       }
 
-      if (!circleHitsRoom(this.x, nextY, this.radius, room)) {
+      if (!circleHitsRoom(this.x, nextY, r, room)) {
         this.y = nextY;
       } else {
         this.vy = 0;
@@ -95,7 +118,7 @@ export class AIsaac {
   }
 
   canTakeDamage() {
-    return this.invincibleTime <= 0;
+    return this.invincibleTime <= 0 && !this.isDying;
   }
 
   takeDamage(amount) {
@@ -105,18 +128,55 @@ export class AIsaac {
     return true;
   }
 
+  startDeath() {
+    if (this.deathState) return;
+    this.deathState = { time: 0, duration: 1.55, phase: "falling" };
+    this.vx = 0;
+    this.vy = 0;
+    this.isWalking = false;
+  }
+
+  updateDeath(dt) {
+    if (!this.deathState) return;
+    this.deathState.time += dt;
+    if (this.deathState.time >= this.deathState.duration) {
+      this.deathState.phase = "done";
+    }
+  }
+
+  resetAt(x, y) {
+    this.x = x;
+    this.y = y;
+    this.vx = 0;
+    this.vy = 0;
+    this.stats = createPlayerStats();
+    this.invincibleTime = 0;
+    this.deathState = null;
+    this.bodyDir = { ...DEFAULT_BODY };
+    this.headDir = { ...DEFAULT_HEAD };
+    this.facing = 1;
+    this.shootCooldown = 0;
+  }
+
   tryShoot() {
-    if (this.shootCooldown > 0) return null;
+    if (this.shootCooldown > 0 || this.isDying) return null;
     this.shootCooldown = this.shootRate;
-    return spawnTear(this, this.headDir);
+    const head = this.headPosition();
+    return spawnTear(this, this.headDir, head);
   }
 
   draw(ctx, layout, screenOverride = null) {
     const screenX = screenOverride ? screenOverride.x : layout.floorX + this.x;
     const screenY = screenOverride ? screenOverride.y : layout.floorY + this.y;
-    const bob = this.isWalking ? Math.sin(this.walkPhase) * 2 : 0;
-    const legSwing = this.isWalking ? Math.sin(this.walkPhase) * 7 : 0;
-    const scale = 1.35;
+
+    if (this.deathState) {
+      this.drawDeath(ctx, screenX, screenY);
+      return;
+    }
+
+    const bob = this.isWalking ? Math.sin(this.walkPhase) * 1.5 : 0;
+    const legSwing = this.isWalking ? Math.sin(this.walkPhase) * 6 : 0;
+    const scale = 1.2;
 
     ctx.save();
     ctx.translate(screenX, screenY + bob);
@@ -126,130 +186,146 @@ export class AIsaac {
       ctx.globalAlpha = 0.45;
     }
 
-    this.drawLeg(ctx, -5, 10 + legSwing);
-    this.drawLeg(ctx, 5, 10 - legSwing);
+    this.drawLeg(ctx, -4, 8 + legSwing);
+    this.drawLeg(ctx, 4, 8 - legSwing);
     this.drawBody(ctx);
     this.drawHead(ctx);
 
     ctx.restore();
   }
 
-  drawLeg(ctx, x, y) {
+  drawDeath(ctx, screenX, screenY) {
+    const t = this.deathState.time;
+    const dur = this.deathState.duration;
+    const p = Math.min(1, t / dur);
+    const fall = Math.min(1, p / 0.55);
+    const slump = Math.max(0, Math.min(1, (p - 0.35) / 0.35));
+    const scale = 1.2;
+
+    ctx.save();
+    ctx.translate(screenX, screenY + slump * 18 + fall * 6);
+    ctx.rotate(fall * Math.PI * 0.48 * this.facing);
+    ctx.scale(this.facing * scale, scale);
+
+    ctx.globalAlpha = 1 - Math.max(0, (p - 0.85) / 0.15) * 0.25;
+
+    this.drawLeg(ctx, -4, 8, true);
+    this.drawLeg(ctx, 4, 8, true);
+    this.drawBody(ctx);
+    this.drawHead(ctx, true);
+
+    if (p > 0.45) {
+      ctx.strokeStyle = "#3a2020";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(-4, -18);
+      ctx.lineTo(4, -10);
+      ctx.moveTo(4, -18);
+      ctx.lineTo(-4, -10);
+      ctx.stroke();
+    }
+
+    ctx.restore();
+  }
+
+  drawLeg(ctx, x, y, flat = false) {
     ctx.fillStyle = "#c9956a";
     ctx.strokeStyle = "#8b6914";
     ctx.lineWidth = 1.5;
-    ctx.fillRect(x - 3.5, y, 7, 11);
-    ctx.strokeRect(x - 3.5, y, 7, 11);
+    const h = flat ? 9 : 10;
+    ctx.fillRect(x - 3, y, 6, h);
+    ctx.strokeRect(x - 3, y, 6, h);
   }
 
   drawBody(ctx) {
+    ctx.fillStyle = "#87b8d8";
+    ctx.strokeStyle = "#4a7898";
+    ctx.lineWidth = 1.8;
+    ctx.fillRect(-9, 0, 18, 14);
+    ctx.strokeRect(-9, 0, 18, 14);
+
     ctx.fillStyle = "#e8c49a";
+    ctx.fillRect(-5, 14, 10, 4);
     ctx.strokeStyle = "#9a7348";
-    ctx.lineWidth = 2;
-    ctx.fillRect(-10, 2, 20, 16);
-    ctx.strokeRect(-10, 2, 20, 16);
+    ctx.strokeRect(-5, 14, 10, 4);
   }
 
-  drawHead(ctx) {
-    const hx = this.headOffsetX();
-    const hy = -8 + this.headOffsetY();
+  drawHead(ctx, dead = false) {
+    const hx = this.headDir.x * 2;
+    const hy = -12 + this.headDir.y * 1.5;
 
-    if (this.headDir.y === 1) {
+    ctx.fillStyle = "#2a1810";
+    ctx.beginPath();
+    ctx.ellipse(hx, hy - 10, 10, 6, 0, Math.PI, Math.PI * 2);
+    ctx.fill();
+
+    if (this.headDir.y === 1 && !dead) {
       this.drawHeadBack(ctx, hx, hy);
       return;
     }
 
-    ctx.fillStyle = "#f5deb3";
-    ctx.strokeStyle = "#8b6914";
-    ctx.lineWidth = 2;
+    ctx.fillStyle = "#f0d8b0";
+    ctx.strokeStyle = "#9a7348";
+    ctx.lineWidth = 1.8;
     ctx.beginPath();
-    ctx.arc(hx, hy, 15, 0, Math.PI * 2);
+    ctx.arc(hx, hy, HEAD_RADIUS, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
 
-    this.drawFace(ctx, hx, hy);
+    if (!dead) this.drawFace(ctx, hx, hy);
   }
 
   drawHeadBack(ctx, hx, hy) {
-    ctx.fillStyle = "#6b4a2e";
-    ctx.strokeStyle = "#4a3018";
-    ctx.lineWidth = 2;
+    ctx.fillStyle = "#2a1810";
     ctx.beginPath();
-    ctx.arc(hx, hy, 15, 0, Math.PI * 2);
+    ctx.ellipse(hx, hy - 8, 10, 7, 0, Math.PI, Math.PI * 2);
     ctx.fill();
-    ctx.stroke();
-
-    ctx.strokeStyle = "#4a3018";
-    ctx.lineWidth = 1.5;
+    ctx.fillStyle = "#f0d8b0";
     ctx.beginPath();
-    ctx.moveTo(hx - 8, hy - 4);
-    ctx.quadraticCurveTo(hx, hy - 10, hx + 8, hy - 4);
-    ctx.stroke();
-  }
-
-  headOffsetX() {
-    if (this.headDir.x !== 0) return this.headDir.x * 3;
-    return 0;
-  }
-
-  headOffsetY() {
-    if (this.headDir.y !== 0) return this.headDir.y * 2;
-    return 0;
+    ctx.arc(hx, hy, HEAD_RADIUS, Math.PI * 0.15, Math.PI * 0.85);
+    ctx.lineTo(hx, hy + 4);
+    ctx.closePath();
+    ctx.fill();
   }
 
   drawFace(ctx, hx, hy) {
     if (this.headDir.y === -1) {
-      this.drawSadFaceFront(ctx, hx, hy);
+      this.drawFaceFront(ctx, hx, hy);
       return;
     }
-
     const side = this.headDir.x > 0 ? 1 : -1;
-    this.drawSadFaceSide(ctx, hx, hy, side);
+    this.drawFaceSide(ctx, hx, hy, side);
   }
 
-  drawSadFaceFront(ctx, hx, hy) {
-    ctx.strokeStyle = "#3a2a22";
-    ctx.lineWidth = 2;
-    ctx.lineCap = "round";
-
+  drawFaceFront(ctx, hx, hy) {
+    ctx.fillStyle = "#fff";
     ctx.beginPath();
-    ctx.moveTo(hx - 8, hy - 5);
-    ctx.lineTo(hx - 4, hy - 3);
-    ctx.moveTo(hx + 8, hy - 5);
-    ctx.lineTo(hx + 4, hy - 3);
-    ctx.stroke();
-
-    ctx.fillStyle = "#222";
-    ctx.beginPath();
-    ctx.arc(hx - 5, hy - 1, 2.2, 0, Math.PI * 2);
-    ctx.arc(hx + 5, hy - 1, 2.2, 0, Math.PI * 2);
+    ctx.ellipse(hx - 4, hy - 1, 3.5, 4, 0, 0, Math.PI * 2);
+    ctx.ellipse(hx + 4, hy - 1, 3.5, 4, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.strokeStyle = "#5a4040";
+    ctx.fillStyle = "#111";
     ctx.beginPath();
-    ctx.moveTo(hx - 4, hy + 6);
-    ctx.quadraticCurveTo(hx, hy + 3, hx + 4, hy + 6);
+    ctx.arc(hx - 4, hy, 1.8, 0, Math.PI * 2);
+    ctx.arc(hx + 4, hy, 1.8, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = "#6a5050";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(hx - 3, hy + 5);
+    ctx.quadraticCurveTo(hx, hy + 3, hx + 3, hy + 5);
     ctx.stroke();
   }
 
-  drawSadFaceSide(ctx, hx, hy, side) {
-    ctx.strokeStyle = "#3a2a22";
-    ctx.lineWidth = 2;
-    ctx.lineCap = "round";
+  drawFaceSide(ctx, hx, hy, side) {
+    ctx.fillStyle = "#fff";
     ctx.beginPath();
-    ctx.moveTo(hx + side * 2, hy - 6);
-    ctx.lineTo(hx + side * 6, hy - 4);
-    ctx.stroke();
-
-    ctx.fillStyle = "#222";
-    ctx.beginPath();
-    ctx.arc(hx + side * 5, hy - 1, 2.2, 0, Math.PI * 2);
+    ctx.ellipse(hx + side * 4, hy - 1, 3, 3.5, 0, 0, Math.PI * 2);
     ctx.fill();
-
-    ctx.strokeStyle = "#5a4040";
+    ctx.fillStyle = "#111";
     ctx.beginPath();
-    ctx.moveTo(hx + side * 2, hy + 5);
-    ctx.quadraticCurveTo(hx + side * 5, hy + 2, hx + side * 8, hy + 5);
-    ctx.stroke();
+    ctx.arc(hx + side * 4, hy, 1.6, 0, Math.PI * 2);
+    ctx.fill();
   }
 }

@@ -72,7 +72,9 @@ export class Pickup {
   }
 
   get collectionKey() {
-    return this.tilePos ? pickupKey(this.type, this.tilePos.tx, this.tilePos.ty) : null;
+    if (this.tilePos?.floorKey) return this.tilePos.floorKey;
+    if (this.tilePos) return pickupKey(this.type, this.tilePos.tx, this.tilePos.ty);
+    return null;
   }
 
   isHeart() {

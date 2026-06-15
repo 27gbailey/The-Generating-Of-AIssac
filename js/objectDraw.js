@@ -15,66 +15,66 @@ export function drawTileShadow(ctx, px, py, scale = 1) {
   ctx.fill();
 }
 
-/** Angular rock with top + side faces (isometric-ish). */
+/** Lumpy boulder — cracked granite chunk with flat facets. */
 export function drawRock3D(ctx, px, py) {
   const cx = px + TILE_SIZE / 2;
-  const top = py + 11;
-  const base = py + TILE_SIZE - 7;
-  const hw = 26;
-  const dip = 6;
+  const base = py + TILE_SIZE - 6;
 
-  drawTileShadow(ctx, px, py, 0.95);
+  drawTileShadow(ctx, px, py, 1);
 
   ctx.save();
 
-  ctx.fillStyle = "#484848";
+  ctx.fillStyle = "#3e3e42";
   ctx.beginPath();
-  ctx.moveTo(cx - 4, top + dip);
-  ctx.lineTo(cx - hw, base - 2);
-  ctx.lineTo(cx - hw + 8, base + 4);
-  ctx.lineTo(cx - 2, top + dip + 10);
+  ctx.moveTo(cx - 22, base - 2);
+  ctx.lineTo(cx - 26, base + 3);
+  ctx.lineTo(cx - 8, base + 4);
+  ctx.lineTo(cx - 6, base - 8);
   ctx.closePath();
   ctx.fill();
 
-  ctx.fillStyle = "#626262";
+  ctx.fillStyle = "#56565c";
   ctx.beginPath();
-  ctx.moveTo(cx + 4, top + dip);
-  ctx.lineTo(cx + hw, base - 2);
-  ctx.lineTo(cx + hw - 8, base + 4);
-  ctx.lineTo(cx + 2, top + dip + 10);
+  ctx.moveTo(cx + 20, base - 4);
+  ctx.lineTo(cx + 28, base + 2);
+  ctx.lineTo(cx + 6, base + 5);
+  ctx.lineTo(cx + 8, base - 10);
   ctx.closePath();
   ctx.fill();
 
-  ctx.fillStyle = "#8a8a8a";
+  ctx.fillStyle = "#767680";
   ctx.beginPath();
-  ctx.moveTo(cx - hw + 6, top);
-  ctx.lineTo(cx + hw - 6, top);
-  ctx.lineTo(cx + hw - 14, top + dip + 2);
-  ctx.lineTo(cx + 10, top + dip + 8);
-  ctx.lineTo(cx - 10, top + dip + 8);
-  ctx.lineTo(cx - hw + 14, top + dip + 2);
+  ctx.moveTo(cx - 20, py + 16);
+  ctx.lineTo(cx + 18, py + 12);
+  ctx.lineTo(cx + 22, py + 28);
+  ctx.lineTo(cx - 4, py + 32);
+  ctx.lineTo(cx - 24, py + 26);
   ctx.closePath();
   ctx.fill();
 
-  ctx.strokeStyle = "rgba(255,255,255,0.14)";
-  ctx.lineWidth = 1.5;
+  ctx.fillStyle = "#9494a0";
   ctx.beginPath();
-  ctx.moveTo(cx - hw + 10, top + 2);
-  ctx.lineTo(cx + 4, top + dip + 4);
+  ctx.moveTo(cx - 10, py + 14);
+  ctx.lineTo(cx + 12, py + 12);
+  ctx.lineTo(cx + 6, py + 22);
+  ctx.lineTo(cx - 8, py + 24);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.strokeStyle = "rgba(20,20,24,0.55)";
+  ctx.lineWidth = 1.4;
+  ctx.beginPath();
+  ctx.moveTo(cx - 14, py + 20);
+  ctx.lineTo(cx + 4, py + 28);
+  ctx.moveTo(cx + 2, py + 16);
+  ctx.lineTo(cx + 16, py + 24);
   ctx.stroke();
 
-  ctx.strokeStyle = "rgba(0,0,0,0.35)";
-  ctx.lineWidth = 1.2;
-  ctx.stroke();
-
-  ctx.fillStyle = "rgba(0,0,0,0.12)";
+  ctx.strokeStyle = "rgba(255,255,255,0.12)";
   ctx.beginPath();
-  ctx.moveTo(cx - 6, top + dip + 6);
-  ctx.lineTo(cx + 8, top + dip + 6);
-  ctx.lineTo(cx + 4, top + dip + 12);
-  ctx.lineTo(cx - 4, top + dip + 12);
-  ctx.closePath();
-  ctx.fill();
+  ctx.moveTo(cx - 8, py + 15);
+  ctx.lineTo(cx + 8, py + 14);
+  ctx.stroke();
 
   ctx.restore();
 }
@@ -154,76 +154,84 @@ export function drawBarrel3D(ctx, px, py, stage = 0, destroyed = false) {
   ctx.restore();
 }
 
-/** Lumpy poop mound with facet shading. */
+/** Classic stacked poop — spiral coils with flies on damage. */
 export function drawPoop3D(ctx, px, py, stage = 0, destroyed = false) {
   const cx = px + TILE_SIZE / 2;
-  const shrink = stage * 1.2;
-  const top = py + 14 + shrink;
-  const base = py + TILE_SIZE - 8;
-  const hw = 24 - shrink;
+  const base = py + TILE_SIZE - 7;
+  const shrink = stage * 1.5;
 
-  drawTileShadow(ctx, px, py, 0.8);
+  drawTileShadow(ctx, px, py, 0.85);
 
   if (destroyed) {
-    ctx.fillStyle = "rgba(90, 70, 45, 0.25)";
+    ctx.fillStyle = "rgba(70, 50, 30, 0.3)";
     ctx.beginPath();
-    ctx.ellipse(cx, base - 2, hw * 0.7, 6, 0, 0, Math.PI * 2);
+    ctx.ellipse(cx, base - 1, 18 - shrink, 5, 0, 0, Math.PI * 2);
     ctx.fill();
     return;
   }
 
   ctx.save();
 
-  ctx.fillStyle = "#3a2818";
-  ctx.beginPath();
-  ctx.moveTo(cx - 4, top + 10);
-  ctx.lineTo(cx - hw, base - 2);
-  ctx.lineTo(cx - hw + 10, base + 2);
-  ctx.lineTo(cx - 2, top + 16);
-  ctx.closePath();
-  ctx.fill();
+  const coils = [
+    { y: base - 4, rx: 22 - shrink, ry: 7, color: "#3a2818" },
+    { y: base - 12 - shrink * 0.4, rx: 18 - shrink * 0.7, ry: 6, color: "#4a3520" },
+    { y: base - 20 - shrink * 0.6, rx: 13 - shrink * 0.5, ry: 5, color: stage >= 1 ? "#5c4022" : "#523818" },
+  ];
 
-  ctx.fillStyle = stage >= 2 ? "#6a4828" : "#5c4022";
-  ctx.beginPath();
-  ctx.moveTo(cx + 4, top + 10);
-  ctx.lineTo(cx + hw, base - 2);
-  ctx.lineTo(cx + hw - 10, base + 2);
-  ctx.lineTo(cx + 2, top + 16);
-  ctx.closePath();
-  ctx.fill();
+  if (stage < 3) {
+    coils.push({
+      y: base - 27 - shrink * 0.8,
+      rx: 8 - shrink * 0.3,
+      ry: 4,
+      color: stage >= 2 ? "#6a4828" : "#5a4020",
+    });
+  }
 
-  ctx.fillStyle = stage >= 1 ? "#7a5530" : "#6a4828";
-  ctx.beginPath();
-  ctx.moveTo(cx - hw + 8, top);
-  ctx.quadraticCurveTo(cx, top - 8, cx + hw - 8, top);
-  ctx.lineTo(cx + hw - 14, top + 12);
-  ctx.quadraticCurveTo(cx, top + 20, cx - hw + 14, top + 12);
-  ctx.closePath();
-  ctx.fill();
-
-  ctx.fillStyle = "rgba(255,255,255,0.08)";
-  ctx.beginPath();
-  ctx.moveTo(cx - hw * 0.35, top + 4);
-  ctx.lineTo(cx - hw * 0.1, top + 10);
-  ctx.lineTo(cx - hw * 0.25, top + 14);
-  ctx.closePath();
-  ctx.fill();
-
-  if (stage >= 1) {
-    ctx.strokeStyle = "rgba(25,15,8,0.6)";
-    ctx.lineWidth = 1.3;
+  for (const coil of coils) {
+    ctx.fillStyle = coil.color;
     ctx.beginPath();
-    ctx.moveTo(cx - hw * 0.3, top + 8);
-    ctx.lineTo(cx + hw * 0.1, top + 14);
+    ctx.ellipse(cx, coil.y, coil.rx, coil.ry, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(20,12,6,0.45)";
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+
+    ctx.strokeStyle = "rgba(255,255,255,0.06)";
+    ctx.beginPath();
+    ctx.arc(cx - coil.rx * 0.35, coil.y - 1, coil.rx * 0.25, 0.3, Math.PI * 0.85);
     ctx.stroke();
   }
 
-  if (stage >= 2) {
-    ctx.fillStyle = "#4a3520";
+  ctx.strokeStyle = "#2a1a10";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(cx - 14, base - 10);
+  ctx.quadraticCurveTo(cx - 6, base - 18, cx + 2, base - 14);
+  ctx.quadraticCurveTo(cx + 10, base - 10, cx + 12, base - 4);
+  ctx.stroke();
+
+  if (stage >= 1) {
+    ctx.fillStyle = "rgba(25,15,8,0.5)";
     ctx.beginPath();
-    ctx.arc(cx - hw * 0.35, base - 4, 4, 0, Math.PI * 2);
-    ctx.arc(cx + hw * 0.2, base - 2, 3.5, 0, Math.PI * 2);
+    ctx.moveTo(cx - 10, base - 16);
+    ctx.lineTo(cx - 6, base - 8);
+    ctx.lineTo(cx - 12, base - 6);
+    ctx.closePath();
     ctx.fill();
+  }
+
+  if (stage >= 2) {
+    ctx.fillStyle = "#1a1008";
+    for (const [ox, oy] of [[-14, base - 22], [10, base - 18], [16, base - 10]]) {
+      ctx.beginPath();
+      ctx.ellipse(cx + ox, oy, 2, 1.2, 0.4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(180,180,180,0.25)";
+      ctx.lineWidth = 0.8;
+      ctx.beginPath();
+      ctx.ellipse(cx + ox + 3, oy - 3, 3, 1.5, 0.2, 0, Math.PI * 2);
+      ctx.stroke();
+    }
   }
 
   ctx.restore();

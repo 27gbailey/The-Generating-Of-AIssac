@@ -90,7 +90,7 @@ export function campfireFireCenter(tx, ty) {
 }
 
 export function checkCampfireBurn(player, room) {
-  const r = 14;
+  const r = player.bodyRadius ?? player.radius;
   const minTx = Math.max(0, Math.floor((player.x - r) / TILE_SIZE));
   const maxTx = Math.min(ROOM_WIDTH - 1, Math.floor((player.x + r) / TILE_SIZE));
   const minTy = Math.max(0, Math.floor((player.y - r) / TILE_SIZE));
@@ -101,7 +101,7 @@ export function checkCampfireBurn(player, room) {
       if (!isCampfireBurning(room, tx, ty)) continue;
       const center = campfireFireCenter(tx, ty);
       const fireR = 12 * campfireIntensity(room, tx, ty);
-      if (Math.hypot(player.x - center.x, player.y - center.y) < fireR + player.radius * 0.55) {
+      if (Math.hypot(player.x - center.x, player.y - center.y) < fireR + r * 0.5) {
         return true;
       }
     }

@@ -82,6 +82,35 @@ function currentCell() {
   return getCurrentRoomData(game.dungeon, game.gx, game.gy);
 }
 
+function checkPlayerDeath() {
+  if (game.player.stats.health <= 0 && !game.player.isDying) {
+    game.player.startDeath();
+    sfx.death();
+    game.tears = [];
+    game.bombs = [];
+  }
+}
+
+function regenerateFloor() {
+  const dungeon = generateDungeon(Date.now());
+  const start = getCurrentRoomData(dungeon, dungeon.start.gx, dungeon.start.gy);
+  const spawn = getSpawnPosition(start.room);
+
+  game.dungeon = dungeon;
+  game.gx = dungeon.start.gx;
+  game.gy = dungeon.start.gy;
+  game.room = start.room;
+  game.bombs = start.bombs ?? [];
+  game.tears = [];
+  game.bursts = [];
+  game.bombCooldown = 0;
+  game.roomTransition = null;
+  syncRoomEntities(start);
+  game.player.resetAt(spawn.x, spawn.y);
+  sfx.floorReset();
+  updateHud();
+}
+
 function boot() {
   const dungeon = generateDungeon();
   const start = getCurrentRoomData(dungeon, dungeon.start.gx, dungeon.start.gy);
@@ -156,7 +185,10 @@ function triggerExplosion(x, y) {
     game.bursts.push(new BombExplosion(bx, by, EXPLOSION_RADIUS_X, EXPLOSION_RADIUS_Y));
     sfx.explosion();
   });
-  if (game.player.stats.health < healthBefore) sfx.hurt();
+  if (game.player.stats.health < healthBefore) {
+    sfx.hurt();
+    checkPlayerDeath();
+  }
   updateStatsHud(game.player.stats);
 }
 
@@ -240,6 +272,18 @@ function update(dt) {
     return;
   }
 
+  if (game.player.isDying) {
+    game.worldTime += dt;
+    game.player.updateDeath(dt);
+    if (game.player.isDead) {
+      regenerateFloor();
+    }
+    for (const burst of game.bursts) burst.update(dt);
+    game.bursts = game.bursts.filter((b) => !b.dead);
+    clearInputFrame(input);
+    return;
+  }
+
   if (game.bombCooldown > 0) game.bombCooldown -= dt;
 
   game.worldTime += dt;
@@ -257,6 +301,7 @@ function update(dt) {
     if (game.player.takeDamage(CAMPFIRE_DAMAGE)) {
       sfx.fireBurn();
       updateStatsHud(game.player.stats);
+      checkPlayerDeath();
     }
   }
 
@@ -270,7 +315,7 @@ function update(dt) {
     game.gy,
     game.dungeon
   );
-  if (transition) {
+  if (transition && !game.player.isDying) {
     sfx.door();
     beginRoomTransition(transition);
     clearInputFrame(input);

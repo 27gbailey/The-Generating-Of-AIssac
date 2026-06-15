@@ -66,6 +66,9 @@ export const CHEST_RADIUS = 28;
 export const EXPLOSION_DAMAGE = 2;
 export const INVINCIBILITY_DURATION = 0.5;
 
+export const BODY_RADIUS = 13;
+export const HEAD_RADIUS = 11;
+
 export const DIRECTIONS = {
   north: { dx: 0, dy: -1, opposite: "south" },
   east: { dx: 1, dy: 0, opposite: "west" },

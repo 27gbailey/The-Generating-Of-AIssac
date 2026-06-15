@@ -56,21 +56,39 @@ function perimeterTiles() {
   return tiles;
 }
 
-/** Sparse accents on the outer ring so rooms don't feel hollow at the edges. */
+/** Guaranteed edge accents — at least 4 objects on the room rim when space allows. */
 function applyPerimeterRing(grid) {
+  const open = [];
   for (const [x, y] of perimeterTiles()) {
     if (isDoorTile(x, y)) continue;
     if (grid[y][x] !== TILE.FLOOR) continue;
-    const hash = (x * 17 + y * 31) % 10;
-    if (hash === 0 || hash === 1) place(grid, x, y, TILE.ROCK);
-    else if (hash === 2) place(grid, x, y, TILE.POOP);
-    else if (hash === 3) place(grid, x, y, TILE.BARREL);
-    else if (hash === 4) place(grid, x, y, TILE.CAMPFIRE);
+    open.push([x, y]);
+  }
+  if (open.length === 0) return;
+
+  open.sort((a, b) => (a[0] * 17 + a[1] * 31) - (b[0] * 17 + b[1] * 31));
+
+  const types = [TILE.ROCK, TILE.ROCK, TILE.POOP, TILE.BARREL, TILE.CAMPFIRE];
+  const minCount = Math.min(4, open.length);
+  const extraCount = Math.min(open.length, Math.floor(open.length * 0.4));
+  const total = Math.max(minCount, extraCount);
+
+  for (let i = 0; i < total; i++) {
+    const [x, y] = open[i];
+    if (grid[y][x] !== TILE.FLOOR) continue;
+    place(grid, x, y, types[(x * 13 + y * 7 + i) % types.length]);
   }
 }
 
 const PRESET_LAYOUTS = {
   empty: { skipPerimeter: true },
+
+  // Simple single-feature rooms
+  single_poop: { poops: [[6, 3]] },
+  single_barrel: { barrels: [[6, 3]] },
+  edge_rocks: { rocks: [[1, 2], [1, 3], [1, 4], [11, 2], [11, 3], [11, 4]] },
+  edge_barrels: { barrels: [[2, 1], [10, 1], [2, 5], [10, 5]] },
+  edge_campfires: { campfires: [[3, 1], [9, 1], [3, 5], [9, 5]] },
 
   // Rock-focused layouts
   single_center: { rocks: [[6, 3]] },
@@ -433,23 +451,65 @@ export function wallsConflictWithNeighbors(blocked, neighborWalls) {
 }
 
 export function pickPresetForCell(rand, requiredWalls, excludeBoss = true) {
-  const pool = excludeBoss
-    ? ROOM_PRESET_POOL.filter((id) => {
-        const { grid } = ROOM_PRESETS[id].buildGrid();
-        const blocked = getBlockedWalls(grid);
-        return !wallsConflictWithNeighbors(blocked, requiredWalls);
-      })
-    : [BOSS_PRESET];
+  const roll = rand();
+  let group;
+  if (roll < 0.32) group = PRESET_GROUPS.minimal;
+  else if (roll < 0.52) group = PRESET_GROUPS.rocks;
+  else if (roll < 0.64) group = PRESET_GROUPS.poops;
+  else if (roll < 0.76) group = PRESET_GROUPS.barrels;
+  else if (roll < 0.84) group = PRESET_GROUPS.campfires;
+  else if (roll < 0.94) group = PRESET_GROUPS.loot;
+  else group = PRESET_GROUPS.puzzle;
 
-  if (pool.length === 0) return "empty";
+  const pool = group.filter((id) => {
+    if (!ROOM_PRESETS[id]) return false;
+    const { grid } = ROOM_PRESETS[id].buildGrid();
+    const blocked = getBlockedWalls(grid);
+    return !wallsConflictWithNeighbors(blocked, requiredWalls);
+  });
 
-  const shuffled = [...pool];
-  for (let i = shuffled.length - 1; i > 0; i--) {
-    const j = Math.floor(rand() * (i + 1));
-    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  if (pool.length === 0) {
+    const fallback = PRESET_GROUPS.minimal.filter((id) => {
+      if (!ROOM_PRESETS[id]) return false;
+      const { grid } = ROOM_PRESETS[id].buildGrid();
+      return !wallsConflictWithNeighbors(getBlockedWalls(grid), requiredWalls);
+    });
+    if (fallback.length) return fallback[Math.floor(rand() * fallback.length)];
+    return "empty";
   }
-  return shuffled[0];
+
+  return pool[Math.floor(rand() * pool.length)];
 }
+
+const PRESET_GROUPS = {
+  minimal: [
+    "empty", "single_center", "twin_rocks", "corner_rocks", "side_pillars",
+    "north_wall", "south_wall", "alcove", "sparse_ring", "edge_rocks",
+  ],
+  rocks: [
+    "single_center", "twin_rocks", "corner_rocks", "rock_cluster", "north_arc",
+    "south_arc", "side_pillars", "north_wall", "south_wall", "edge_rocks",
+  ],
+  poops: [
+    "single_poop", "poop_corners", "poop_stacks", "poop_ring", "poop_cross",
+    "edge_rocks",
+  ],
+  barrels: [
+    "single_barrel", "edge_barrels", "barrel_triangle", "barrel_scatter",
+    "barrel_north_row", "barrel_south_row",
+  ],
+  campfires: [
+    "campfire_center", "campfire_north", "twin_campfires", "edge_campfires",
+  ],
+  loot: [
+    "west_cache", "east_vault", "north_loot", "south_stash", "single_center",
+    "twin_rocks", "campfire_center",
+  ],
+  puzzle: [
+    "poop_gate", "barrier_blast", "split_chamber", "chain_hall", "choke_point",
+    "campfire_puzzle", "fire_ring", "blast_corridor",
+  ],
+};
 
 export function buildRoomFromPreset(presetId, doors) {
   const preset = ROOM_PRESETS[presetId];

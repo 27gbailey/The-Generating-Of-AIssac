@@ -71,6 +71,11 @@ export const sfx = {
   hurt: () => tone(150, 0.18, "sawtooth", 0.07, 90),
   fireBurn: () => tone(200, 0.1, "triangle", 0.04, 160),
   door: () => tone(260, 0.14, "sine", 0.04, 180),
+  death: () => {
+    tone(180, 0.35, "sawtooth", 0.08, 40);
+    tone(90, 0.5, "triangle", 0.06, 30);
+  },
+  floorReset: () => tone(120, 0.2, "sine", 0.05, 220),
   barrelExplode: () => {
     noise(0.15, 0.1);
     tone(55, 0.2, "square", 0.07, 25);

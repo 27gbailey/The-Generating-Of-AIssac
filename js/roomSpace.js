@@ -11,6 +11,7 @@ import { isBarrelSolid, barrelHitbox } from "./barrel.js";
 import { isRockSolid } from "./destructibles.js";
 import { findPoopHit, isPoopSolid, poopHitbox } from "./poop.js";
 import { circleIntersectsObjectHitbox, objectHitbox } from "./objectHitbox.js";
+import { BODY_RADIUS } from "./constants.js";
 
 export function getPlayAreaSize() {
   return {
@@ -175,7 +176,7 @@ export function getSpawnPosition(room) {
   let y = height / 2;
 
   for (let i = 0; i < 24; i++) {
-    if (!circleHitsRoom(x, y, 20, room)) return { x, y };
+    if (!circleHitsRoom(x, y, BODY_RADIUS, room)) return { x, y };
     x = width / 2 + (Math.random() - 0.5) * TILE_SIZE * 2;
     y = height / 2 + (Math.random() - 0.5) * TILE_SIZE * 2;
   }

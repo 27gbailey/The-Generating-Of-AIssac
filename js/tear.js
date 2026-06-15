@@ -88,11 +88,12 @@ export class Tear {
   }
 }
 
-export function spawnTear(player, headDir) {
-  const offset = player.radius + TEAR_RADIUS + 6;
+export function spawnTear(player, headDir, headPos = null) {
+  const head = headPos ?? player.headPosition?.() ?? { x: player.x, y: player.y - 14 };
+  const offset = TEAR_RADIUS + 8;
   return new Tear(
-    player.x + headDir.x * offset,
-    player.y + headDir.y * offset,
+    head.x + headDir.x * offset,
+    head.y + headDir.y * offset,
     headDir.x,
     headDir.y
   );

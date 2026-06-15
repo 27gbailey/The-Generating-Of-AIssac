@@ -16,6 +16,7 @@ import { initDestroyedRocks } from "./destructibles.js";
 import { initBarrelStates } from "./barrel.js";
 import { initCampfireStates } from "./campfire.js";
 import { spawnChestsInDungeon } from "./chestSpawner.js";
+import { spawnFloorPickupsInDungeon } from "./pickupSpawner.js";
 import { createPickupsFromLayout } from "./pickup.js";
 
 function mulberry32(seed) {
@@ -283,6 +284,7 @@ export function generateDungeon(seed = Date.now()) {
   };
 
   spawnChestsInDungeon(dungeon, rand);
+  spawnFloorPickupsInDungeon(dungeon, rand);
   return dungeon;
 }
 
@@ -292,13 +294,14 @@ export function getCurrentRoomData(dungeon, gx, gy) {
 
 export function checkDoorTransition(player, room, gx, gy, dungeon) {
   const { width, height } = getPlayAreaSize();
-  const r = player.radius * 0.85;
+  const r = player.bodyRadius ?? player.radius;
+  const rDoor = r * 0.85;
 
   const checks = [
-    { wall: "north", test: player.y - r <= 0, nx: gx, ny: gy - 1, entry: "south" },
-    { wall: "south", test: player.y + r >= height, nx: gx, ny: gy + 1, entry: "north" },
-    { wall: "west", test: player.x - r <= 0, nx: gx - 1, ny: gy, entry: "east" },
-    { wall: "east", test: player.x + r >= width, nx: gx + 1, ny: gy, entry: "west" },
+    { wall: "north", test: player.y - rDoor <= 0, nx: gx, ny: gy - 1, entry: "south" },
+    { wall: "south", test: player.y + rDoor >= height, nx: gx, ny: gy + 1, entry: "north" },
+    { wall: "west", test: player.x - rDoor <= 0, nx: gx - 1, ny: gy, entry: "east" },
+    { wall: "east", test: player.x + rDoor >= width, nx: gx + 1, ny: gy, entry: "west" },
   ];
 
   for (const check of checks) {
