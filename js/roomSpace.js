@@ -127,7 +127,7 @@ export function getSpawnPosition(room) {
   let y = height / 2;
 
   for (let i = 0; i < 24; i++) {
-    if (!circleHitsRoom(x, y, 24, room)) return { x, y };
+    if (!circleHitsRoom(x, y, 20, room)) return { x, y };
     x = width / 2 + (Math.random() - 0.5) * TILE_SIZE * 2;
     y = height / 2 + (Math.random() - 0.5) * TILE_SIZE * 2;
   }
