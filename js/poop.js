@@ -7,7 +7,7 @@ import {
 } from "./constants.js";
 import {
   circleIntersectsObjectHitbox,
-  traceObjectRect,
+  traceObjectVisual,
 } from "./objectHitbox.js";
 
 export { objectHitbox as poopHitbox } from "./objectHitbox.js";
@@ -71,62 +71,56 @@ export function poopDamageStage(hits, destroyed) {
 export function drawPoop(ctx, px, py, hits, destroyed) {
   if (destroyed) {
     ctx.fillStyle = "rgba(90, 70, 45, 0.22)";
-    traceObjectRect(ctx, px, py);
+    traceObjectVisual(ctx, px, py);
     ctx.fill();
     return;
   }
 
   const stage = poopDamageStage(hits, destroyed);
-  const shrink = stage * 1.5;
+  const shrink = stage * 0.8;
+  const { cx, cy, rx, ry } = traceObjectVisual(ctx, px + shrink, py + shrink);
 
   ctx.save();
 
-  traceObjectRect(ctx, px, py);
+  traceObjectVisual(ctx, px, py);
   ctx.fillStyle = "#3a2818";
   ctx.fill();
 
-  ctx.save();
-  traceObjectRect(ctx, px + shrink * 0.5, py + shrink * 0.5);
-  ctx.clip();
-
-  const { x, y, w, h } = traceObjectRect(ctx, px, py);
-  const cx = x + w / 2;
-  const cy = y + h / 2;
-
-  const bodyGrad = ctx.createLinearGradient(x, y, x, y + h);
+  const bodyGrad = ctx.createLinearGradient(cx, cy - ry, cx, cy + ry);
   bodyGrad.addColorStop(0, stage >= 2 ? "#7a5530" : "#6a4828");
   bodyGrad.addColorStop(0.55, stage >= 1 ? "#5c4022" : "#4a3520");
   bodyGrad.addColorStop(1, "#3a2818");
   ctx.fillStyle = bodyGrad;
+  traceObjectVisual(ctx, px + shrink, py + shrink);
   ctx.fill();
 
   ctx.fillStyle = "rgba(255, 255, 255, 0.07)";
   ctx.beginPath();
-  ctx.ellipse(cx - w * 0.18, cy - h * 0.22, w * 0.14, h * 0.1, -0.35, 0, Math.PI * 2);
+  ctx.ellipse(cx - rx * 0.28, cy - ry * 0.3, rx * 0.2, ry * 0.14, -0.35, 0, Math.PI * 2);
   ctx.fill();
 
   ctx.fillStyle = "rgba(35, 22, 10, 0.35)";
   ctx.beginPath();
-  ctx.ellipse(cx + w * 0.12, cy + h * 0.18, w * 0.22, h * 0.14, 0.2, 0, Math.PI * 2);
+  ctx.ellipse(cx + rx * 0.18, cy + ry * 0.22, rx * 0.28, ry * 0.18, 0.2, 0, Math.PI * 2);
   ctx.fill();
 
   if (stage >= 1) {
     ctx.strokeStyle = "rgba(25, 15, 8, 0.65)";
     ctx.lineWidth = 1.4;
     ctx.beginPath();
-    ctx.moveTo(cx - w * 0.28, cy - h * 0.05);
-    ctx.lineTo(cx + w * 0.08, cy + h * 0.12);
-    ctx.moveTo(cx + w * 0.18, cy - h * 0.18);
-    ctx.lineTo(cx + w * 0.32, cy + h * 0.08);
+    ctx.moveTo(cx - rx * 0.42, cy - ry * 0.05);
+    ctx.lineTo(cx + rx * 0.12, cy + ry * 0.22);
+    ctx.moveTo(cx + rx * 0.28, cy - ry * 0.28);
+    ctx.lineTo(cx + rx * 0.48, cy + ry * 0.12);
     ctx.stroke();
   }
 
   if (stage >= 2) {
     ctx.fillStyle = "#4a3520";
     for (const [ox, oy, r] of [
-      [-w * 0.28, h * 0.22, w * 0.1],
-      [w * 0.22, h * 0.28, w * 0.08],
-      [0, h * 0.32, w * 0.07],
+      [-rx * 0.42, ry * 0.35, rx * 0.14],
+      [rx * 0.32, ry * 0.42, rx * 0.11],
+      [0, ry * 0.48, rx * 0.1],
     ]) {
       ctx.beginPath();
       ctx.arc(cx + ox, cy + oy, r, 0, Math.PI * 2);
@@ -137,15 +131,13 @@ export function drawPoop(ctx, px, py, hits, destroyed) {
   if (stage >= 3) {
     ctx.fillStyle = "rgba(90, 70, 45, 0.5)";
     ctx.beginPath();
-    ctx.ellipse(cx, cy + h * 0.28, w * 0.42, h * 0.16, 0, 0, Math.PI * 2);
+    ctx.ellipse(cx, cy + ry * 0.38, rx * 0.55, ry * 0.2, 0, 0, Math.PI * 2);
     ctx.fill();
   }
 
-  ctx.restore();
-
-  ctx.strokeStyle = "rgba(20, 12, 6, 0.55)";
+  ctx.strokeStyle = "rgba(20, 12, 6, 0.45)";
   ctx.lineWidth = 1.5;
-  traceObjectRect(ctx, px, py);
+  traceObjectVisual(ctx, px + shrink, py + shrink);
   ctx.stroke();
 
   ctx.restore();

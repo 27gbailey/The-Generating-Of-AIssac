@@ -1,6 +1,7 @@
 import { circleHitsRoom } from "./roomSpace.js";
 import { getBodyVector, getHeadVector } from "./input.js";
 import { spawnTear } from "./tear.js";
+import { createPlayerStats } from "./stats.js";
 
 const DEFAULT_BODY = { x: 0, y: 1 };
 const DEFAULT_HEAD = { x: 0, y: -1 };
@@ -22,6 +23,7 @@ export class AIsaac {
     this.isWalking = false;
     this.shootCooldown = 0;
     this.shootRate = 0.32;
+    this.stats = createPlayerStats();
   }
 
   update(dt, keys, room) {

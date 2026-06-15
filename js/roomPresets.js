@@ -14,13 +14,23 @@ function place(grid, x, y, code) {
   }
 }
 
-function buildLayout({ rocks = [], poops = [], blood = [], barrels = [] } = {}) {
+function normalizePickups(raw = []) {
+  return raw.map((entry) => {
+    if (Array.isArray(entry)) {
+      const [type, x, y] = entry;
+      return { type, x, y };
+    }
+    return entry;
+  });
+}
+
+function buildLayout({ rocks = [], poops = [], blood = [], barrels = [], pickups = [] } = {}) {
   const grid = createEmptyGrid();
   for (const [x, y] of rocks) place(grid, x, y, TILE.ROCK);
   for (const [x, y] of poops) place(grid, x, y, TILE.POOP);
   for (const [x, y] of blood) place(grid, x, y, TILE.BLOOD);
   for (const [x, y] of barrels) place(grid, x, y, TILE.BARREL);
-  return grid;
+  return { grid, pickups: normalizePickups(pickups) };
 }
 
 const PRESET_LAYOUTS = {
@@ -69,6 +79,7 @@ const PRESET_LAYOUTS = {
   toxic_airlock: {
     rocks: [[2, 2], [2, 4], [10, 2], [10, 4], [6, 2], [6, 4]],
     poops: [[4, 2], [4, 3], [4, 4], [8, 2], [8, 3], [8, 4]],
+    pickups: [["key", 6, 3]],
   },
   poop_ring: {
     rocks: [[6, 3], [3, 2], [9, 4]],
@@ -97,6 +108,7 @@ const PRESET_LAYOUTS = {
   poop_north_seal: {
     rocks: [[2, 1], [10, 1], [2, 5], [10, 5]],
     poops: [[3, 2], [4, 2], [5, 2], [6, 2], [7, 2], [8, 2], [9, 2]],
+    pickups: [["half_heart", 8, 1]],
   },
 
   // Clever mixed / puzzle layouts
@@ -147,26 +159,31 @@ const PRESET_LAYOUTS = {
   split_chamber: {
     rocks: [[3, 1], [3, 2], [3, 3], [3, 4], [3, 5], [9, 1], [9, 2], [9, 3], [9, 4], [9, 5]],
     poops: [[4, 3], [5, 3], [6, 3], [7, 3], [8, 3]],
+    pickups: [["penny", 10, 2], ["half_heart", 10, 3]],
   },
   barrier_blast: {
     rocks: [[4, 2], [4, 4], [8, 2], [8, 4]],
     barrels: [[5, 1], [5, 2], [5, 3], [5, 4], [5, 5], [7, 1], [7, 2], [7, 3], [7, 4], [7, 5]],
     poops: [[6, 3]],
+    pickups: [["key", 10, 3]],
   },
   chain_hall: {
     rocks: [[1, 2], [1, 4], [11, 2], [11, 4], [5, 2], [5, 4], [8, 2], [8, 4]],
     poops: [[7, 3], [8, 3], [9, 3], [10, 3]],
     barrels: [[2, 3], [3, 3], [4, 3], [5, 3], [6, 3]],
+    pickups: [["penny", 10, 2], ["penny", 10, 4]],
   },
   double_lock: {
     rocks: [[2, 2], [2, 4], [10, 2], [10, 4]],
     poops: [[4, 3], [5, 3], [6, 3]],
     barrels: [[7, 3], [8, 3], [9, 3]],
+    pickups: [["half_heart", 10, 3]],
   },
   barrel_chamber: {
     rocks: [[7, 2], [7, 3], [7, 4], [8, 2], [8, 4], [9, 2], [9, 3], [9, 4], [10, 3]],
     barrels: [[8, 3]],
     poops: [[4, 2], [4, 3], [4, 4], [5, 3], [6, 3]],
+    pickups: [["full_heart", 9, 3]],
   },
   barrel_diagonal: {
     rocks: [[1, 5], [11, 1], [7, 2], [3, 4], [10, 3]],
@@ -177,6 +194,7 @@ const PRESET_LAYOUTS = {
     rocks: [[2, 2], [10, 4], [2, 4], [10, 2], [6, 2], [6, 4]],
     barrels: [[3, 3], [4, 3], [5, 3], [6, 3], [7, 3], [8, 3], [9, 3]],
     poops: [[6, 5], [7, 5]],
+    pickups: [["bomb", 10, 3]],
   },
   barrel_fuse_v: {
     rocks: [[4, 2], [8, 4], [4, 4], [8, 2], [3, 3], [9, 3]],
@@ -196,6 +214,95 @@ const PRESET_LAYOUTS = {
     poops: [[3, 4], [5, 3], [7, 2], [9, 3]],
     rocks: [[6, 5], [2, 2]],
     barrels: [[8, 5]],
+  },
+
+  // --- 40 additional layouts (sparse to dense) ---
+  lone_barrel: { barrels: [[6, 3]] },
+  lone_poop: { poops: [[6, 3]] },
+  pebble_pair: { rocks: [[5, 3], [7, 3]] },
+  offset_rock: { rocks: [[4, 2]] },
+  quiet_corner: { rocks: [[10, 5]] },
+  drip_poop: { poops: [[6, 2], [6, 4]] },
+  twin_barrels: { barrels: [[4, 3], [8, 3]] },
+  spare_pillar: { rocks: [[6, 2], [6, 4]] },
+  lone_key_drop: { pickups: [["key", 6, 3]] },
+  penny_nook: { rocks: [[2, 3]], pickups: [["penny", 3, 3]] },
+
+  rock_arrow: { rocks: [[6, 1], [5, 2], [6, 2], [7, 2], [6, 3]] },
+  rock_chevron: { rocks: [[4, 2], [5, 1], [6, 1], [7, 1], [8, 2]] },
+  rock_ladder: { rocks: [[3, 2], [3, 3], [3, 4], [9, 2], [9, 3], [9, 4]] },
+  rock_hourglass: {
+    rocks: [[4, 1], [5, 1], [7, 1], [8, 1], [5, 3], [7, 3], [4, 5], [5, 5], [7, 5], [8, 5]],
+  },
+  rock_spine: { rocks: [[6, 1], [6, 2], [6, 3], [6, 4], [6, 5], [4, 3], [8, 3]] },
+  rock_bowl: {
+    rocks: [[4, 2], [5, 2], [7, 2], [8, 2], [4, 4], [5, 4], [7, 4], [8, 4]],
+  },
+  rock_shelf: { rocks: [[2, 1], [3, 1], [4, 1], [5, 1], [7, 1], [8, 1], [9, 1], [10, 1]] },
+  rock_steps: { rocks: [[2, 5], [4, 4], [6, 3], [8, 2], [10, 1]] },
+
+  poop_trip: { poops: [[5, 3], [6, 3], [7, 3]] },
+  poop_pillars_v: { poops: [[4, 2], [4, 3], [4, 4], [8, 2], [8, 3], [8, 4]] },
+  poop_l_shape: { poops: [[3, 2], [3, 3], [3, 4], [4, 4], [5, 4]] },
+  poop_ramp: { poops: [[3, 5], [4, 4], [5, 3], [6, 2]] },
+  poop_west_wall: { poops: [[2, 2], [2, 3], [2, 4], [3, 3]] },
+  poop_east_wall: { poops: [[10, 2], [10, 3], [10, 4], [9, 3]] },
+
+  barrel_triangle: { barrels: [[6, 2], [5, 4], [7, 4]] },
+  barrel_scatter: { barrels: [[3, 2], [9, 4], [6, 5]] },
+  barrel_north_row: { barrels: [[4, 1], [6, 1], [8, 1]] },
+  barrel_south_row: { barrels: [[4, 5], [6, 5], [8, 5]] },
+  barrel_cross: { barrels: [[6, 2], [5, 3], [6, 3], [7, 3], [6, 4]] },
+
+  rock_poop_gate: {
+    rocks: [[4, 2], [8, 2], [4, 4], [8, 4]],
+    poops: [[5, 3], [6, 3], [7, 3]],
+  },
+  barrel_rock_maze: {
+    rocks: [[5, 2], [7, 2], [5, 4], [7, 4]],
+    barrels: [[6, 3], [3, 3], [9, 3]],
+  },
+  poop_barrel_cross: {
+    poops: [[6, 2], [6, 4], [5, 3], [7, 3]],
+    barrels: [[6, 3]],
+  },
+  choke_point: {
+    rocks: [[5, 2], [7, 2]],
+    poops: [[6, 3]],
+    barrels: [[6, 4]],
+  },
+  west_cache: {
+    rocks: [[3, 2], [3, 3], [3, 4]],
+    poops: [[2, 3]],
+    pickups: [["penny", 1, 3]],
+  },
+  east_vault: {
+    rocks: [[9, 1], [9, 2], [9, 3], [9, 4], [9, 5]],
+    barrels: [[10, 2], [10, 4]],
+    pickups: [["key", 10, 3]],
+  },
+  north_loot: {
+    poops: [[5, 2], [6, 2], [7, 2]],
+    pickups: [["half_heart", 6, 1]],
+  },
+  south_stash: {
+    rocks: [[4, 4], [8, 4]],
+    poops: [[6, 4]],
+    pickups: [["bomb", 6, 5]],
+  },
+  blast_corridor: {
+    rocks: [[2, 2], [2, 4], [10, 2], [10, 4]],
+    barrels: [[5, 3], [6, 3], [7, 3]],
+  },
+
+  gauntlet_run: {
+    rocks: [[2, 2], [2, 4], [4, 3], [8, 3], [10, 2], [10, 4]],
+    poops: [[6, 2], [6, 4]],
+    barrels: [[6, 3]],
+  },
+  toxic_maze: {
+    rocks: [[4, 2], [8, 2], [4, 4], [8, 4], [6, 2], [6, 4]],
+    poops: [[5, 3], [6, 3], [7, 3], [5, 2], [7, 4]],
   },
 
   boss_chamber: {
@@ -227,21 +334,25 @@ export const ROOM_PRESET_POOL = Object.keys(LAYOUT_BUILDERS).filter(
 );
 
 export const ROOM_PRESETS = Object.fromEntries(
-  Object.entries(LAYOUT_BUILDERS).map(([id, buildGrid]) => [
-    id,
-    {
+  Object.entries(LAYOUT_BUILDERS).map(([id, buildLayoutFn]) => {
+    const { grid, pickups } = buildLayoutFn();
+    return [
       id,
-      name: id === BOSS_PRESET ? "Boss Chamber" : formatPresetName(id),
-      isBoss: id === BOSS_PRESET,
-      buildGrid,
-      baseRoomId: encodeRoomId(buildGrid(), {
-        north: false,
-        east: false,
-        south: false,
-        west: false,
-      }),
-    },
-  ])
+      {
+        id,
+        name: id === BOSS_PRESET ? "Boss Chamber" : formatPresetName(id),
+        isBoss: id === BOSS_PRESET,
+        buildGrid: buildLayoutFn,
+        presetPickups: pickups,
+        baseRoomId: encodeRoomId(grid, {
+          north: false,
+          east: false,
+          south: false,
+          west: false,
+        }),
+      },
+    ];
+  })
 );
 
 function formatPresetName(id) {
@@ -275,7 +386,7 @@ export function wallsConflictWithNeighbors(blocked, neighborWalls) {
 export function pickPresetForCell(rand, requiredWalls, excludeBoss = true) {
   const pool = excludeBoss
     ? ROOM_PRESET_POOL.filter((id) => {
-        const grid = ROOM_PRESETS[id].buildGrid();
+        const { grid } = ROOM_PRESETS[id].buildGrid();
         const blocked = getBlockedWalls(grid);
         return !wallsConflictWithNeighbors(blocked, requiredWalls);
       })
@@ -297,13 +408,15 @@ export function buildRoomFromPreset(presetId, doors) {
     throw new Error(`Unknown room preset "${presetId}".`);
   }
 
-  const roomId = encodeRoomId(preset.buildGrid(), doors);
+  const { grid, pickups } = preset.buildGrid();
+  const roomId = encodeRoomId(grid, doors);
   const room = decodeRoomId(roomId);
   return {
     ...room,
     presetId,
     isBoss: preset.isBoss,
     blockedWalls: getBlockedWalls(room.grid),
+    presetPickups: pickups,
     poopStates: null,
     destroyedRocks: null,
     barrelStates: null,

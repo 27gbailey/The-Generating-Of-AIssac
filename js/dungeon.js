@@ -14,6 +14,8 @@ import { isInDoorGap } from "./doors.js";
 import { initPoopStates } from "./poop.js";
 import { initDestroyedRocks } from "./destructibles.js";
 import { initBarrelStates } from "./barrel.js";
+import { spawnChestsInDungeon } from "./chestSpawner.js";
+import { createPickupsFromLayout } from "./pickup.js";
 
 function mulberry32(seed) {
   return function rand() {
@@ -146,6 +148,11 @@ function presetGrid(presetId) {
   }).grid;
 }
 
+function initCellPickups(cell, built) {
+  if (!cell.collectedPickups) cell.collectedPickups = new Set();
+  cell.pickups = createPickupsFromLayout(built.presetPickups ?? [], cell.collectedPickups);
+}
+
 function computeDoors(cell, cells, presetId) {
   const blocked = getBlockedWalls(presetGrid(presetId));
   const doors = { north: false, east: false, south: false, west: false };
@@ -243,6 +250,7 @@ export function generateDungeon(seed = Date.now()) {
     if (!cell.bombs) {
       cell.bombs = [];
     }
+    initCellPickups(cell, built);
     built.poopStates = cell.poopStates;
     built.destroyedRocks = cell.destroyedRocks;
     built.barrelStates = cell.barrelStates;
@@ -253,17 +261,23 @@ export function generateDungeon(seed = Date.now()) {
       destroyedRocks: cell.destroyedRocks,
       barrelStates: cell.barrelStates,
       bombs: cell.bombs,
+      pickups: cell.pickups,
+      collectedPickups: cell.collectedPickups,
+      chest: cell.chest ?? null,
       room: built,
     };
   }
 
-  return {
+  const dungeon = {
     seed,
     rooms,
     start: { gx: startX, gy: startY },
     boss: { gx: bossCell.gx, gy: bossCell.gy },
     visited: new Set([`${startX},${startY}`]),
   };
+
+  spawnChestsInDungeon(dungeon, rand);
+  return dungeon;
 }
 
 export function getCurrentRoomData(dungeon, gx, gy) {

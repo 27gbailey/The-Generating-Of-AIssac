@@ -1,7 +1,5 @@
 import {
   DOOR_WALLS,
-  ROCK_HITBOX_INSET,
-  ROCK_HITBOX_RADIUS,
   ROOM_HEIGHT,
   ROOM_WIDTH,
   TILE,
@@ -12,6 +10,7 @@ import { doorSegment } from "./doors.js";
 import { isRockSolid } from "./destructibles.js";
 import { drawBarrel } from "./barrel.js";
 import { drawPoop } from "./poop.js";
+import { traceRockVisual } from "./objectHitbox.js";
 import {
   createRoomAmbience,
   drawRoomAmbience,
@@ -54,39 +53,17 @@ export function tickRoomAmbience(cellKey, dt, dungeonSeed) {
 }
 
 function drawRock(ctx, px, py) {
-  const inset = ROCK_HITBOX_INSET;
-  const w = TILE_SIZE - inset * 2;
-  const h = TILE_SIZE - inset * 2;
-  const x = px + inset;
-  const y = py + inset;
-  const r = ROCK_HITBOX_RADIUS;
-
-  const traceRockPath = () => {
-    ctx.beginPath();
-    if (typeof ctx.roundRect === "function") {
-      ctx.roundRect(x, y, w, h, r);
-    } else {
-      ctx.moveTo(x + r, y);
-      ctx.lineTo(x + w - r, y);
-      ctx.quadraticCurveTo(x + w, y, x + w, y + r);
-      ctx.lineTo(x + w, y + h - r);
-      ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-      ctx.lineTo(x + r, y + h);
-      ctx.quadraticCurveTo(x, y + h, x, y + h - r);
-      ctx.lineTo(x, y + r);
-      ctx.quadraticCurveTo(x, y, x + r, y);
-      ctx.closePath();
-    }
-  };
-
-  traceRockPath();
+  traceRockVisual(ctx, px, py);
   ctx.fillStyle = TILE_COLORS[TILE.ROCK];
   ctx.fill();
 
-  ctx.fillStyle = "rgba(255,255,255,0.08)";
-  ctx.fillRect(x + 3, y + 3, w * 0.45, h * 0.35);
+  const { cx, cy, rx } = traceRockVisual(ctx, px, py);
+  ctx.fillStyle = "rgba(255,255,255,0.1)";
+  ctx.beginPath();
+  ctx.ellipse(cx - rx * 0.2, cy - rx * 0.25, rx * 0.28, rx * 0.18, -0.3, 0, Math.PI * 2);
+  ctx.fill();
 
-  traceRockPath();
+  traceRockVisual(ctx, px, py);
   ctx.strokeStyle = "rgba(0,0,0,0.25)";
   ctx.lineWidth = 1.5;
   ctx.stroke();

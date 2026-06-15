@@ -1,5 +1,4 @@
 import {
-  EXPLOSION_KNOCKBACK,
   EXPLOSION_RADIUS_X,
   EXPLOSION_RADIUS_Y,
   ROOM_HEIGHT,
@@ -7,7 +6,7 @@ import {
   TILE,
   TILE_SIZE,
 } from "./constants.js";
-import { destroyBarrelInstant, findBarrelsInExplosion, isBarrelSolid } from "./barrel.js";
+import { destroyBarrelInstant, isBarrelSolid } from "./barrel.js";
 import { destroyPoopInstant, destroyRock, isRockSolid } from "./destructibles.js";
 import { isPoopSolid } from "./poop.js";
 
@@ -17,6 +16,34 @@ export function pointInExplosion(px, py, cx, cy, radiusX = EXPLOSION_RADIUS_X, r
   return dx * dx + dy * dy <= 1;
 }
 
+export function tileIntersectsExplosion(tx, ty, cx, cy, radiusX = EXPLOSION_RADIUS_X, radiusY = EXPLOSION_RADIUS_Y) {
+  const left = tx * TILE_SIZE;
+  const top = ty * TILE_SIZE;
+  const right = left + TILE_SIZE;
+  const bottom = top + TILE_SIZE;
+
+  if (cx >= left && cx < right && cy >= top && cy < bottom) return true;
+
+  const inset = 4;
+  const samples = [
+    [left + TILE_SIZE / 2, top + TILE_SIZE / 2],
+    [left + inset, top + inset],
+    [right - inset, top + inset],
+    [left + inset, bottom - inset],
+    [right - inset, bottom - inset],
+    [left + TILE_SIZE / 2, top + inset],
+    [left + TILE_SIZE / 2, bottom - inset],
+    [left + inset, top + TILE_SIZE / 2],
+    [right - inset, top + TILE_SIZE / 2],
+  ];
+
+  for (const [sx, sy] of samples) {
+    if (pointInExplosion(sx, sy, cx, cy, radiusX, radiusY)) return true;
+  }
+
+  return false;
+}
+
 export function tileCenter(tx, ty) {
   return {
     x: tx * TILE_SIZE + TILE_SIZE / 2,
@@ -24,16 +51,21 @@ export function tileCenter(tx, ty) {
   };
 }
 
+export function explosionTileBounds(cx, cy, radiusX = EXPLOSION_RADIUS_X, radiusY = EXPLOSION_RADIUS_Y) {
+  return {
+    minTx: Math.max(0, Math.floor((cx - radiusX) / TILE_SIZE)),
+    maxTx: Math.min(ROOM_WIDTH - 1, Math.floor((cx + radiusX) / TILE_SIZE)),
+    minTy: Math.max(0, Math.floor((cy - radiusY) / TILE_SIZE)),
+    maxTy: Math.min(ROOM_HEIGHT - 1, Math.floor((cy + radiusY) / TILE_SIZE)),
+  };
+}
+
 export function destroyObjectsInExplosion(room, cx, cy, radiusX = EXPLOSION_RADIUS_X, radiusY = EXPLOSION_RADIUS_Y) {
-  const minTx = Math.max(0, Math.floor((cx - radiusX) / TILE_SIZE));
-  const maxTx = Math.min(ROOM_WIDTH - 1, Math.floor((cx + radiusX) / TILE_SIZE));
-  const minTy = Math.max(0, Math.floor((cy - radiusY) / TILE_SIZE));
-  const maxTy = Math.min(ROOM_HEIGHT - 1, Math.floor((cy + radiusY) / TILE_SIZE));
+  const { minTx, maxTx, minTy, maxTy } = explosionTileBounds(cx, cy, radiusX, radiusY);
 
   for (let ty = minTy; ty <= maxTy; ty++) {
     for (let tx = minTx; tx <= maxTx; tx++) {
-      const center = tileCenter(tx, ty);
-      if (!pointInExplosion(center.x, center.y, cx, cy, radiusX, radiusY)) continue;
+      if (!tileIntersectsExplosion(tx, ty, cx, cy, radiusX, radiusY)) continue;
 
       const code = room.grid[ty][tx];
       if (code === TILE.ROCK && isRockSolid(room, tx, ty)) {
@@ -45,6 +77,21 @@ export function destroyObjectsInExplosion(room, cx, cy, radiusX = EXPLOSION_RADI
       }
     }
   }
+}
+
+export function findBarrelsInExplosion(room, cx, cy, radiusX = EXPLOSION_RADIUS_X, radiusY = EXPLOSION_RADIUS_Y) {
+  const hits = [];
+  const { minTx, maxTx, minTy, maxTy } = explosionTileBounds(cx, cy, radiusX, radiusY);
+
+  for (let ty = minTy; ty <= maxTy; ty++) {
+    for (let tx = minTx; tx <= maxTx; tx++) {
+      if (!isBarrelSolid(room, tx, ty)) continue;
+      if (!tileIntersectsExplosion(tx, ty, cx, cy, radiusX, radiusY)) continue;
+      const center = tileCenter(tx, ty);
+      hits.push({ tx, ty, x: center.x, y: center.y, key: `${tx},${ty}` });
+    }
+  }
+  return hits;
 }
 
 export function collectChainDetonations(room, cx, cy, bombs, radiusX = EXPLOSION_RADIUS_X, radiusY = EXPLOSION_RADIUS_Y) {

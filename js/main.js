@@ -14,11 +14,43 @@ import {
   entryPosition,
 } from "./dungeon.js";
 import { drawMinimap } from "./minimap.js";
+import { initStatsHud, updateRoomHud, updateStatsHud } from "./hud.js";
+import { collectPushableEntities } from "./pushablePhysics.js";
+
+function syncRoomEntities(cell) {
+  game.chest = cell?.chest ?? null;
+  game.pickups = cell?.pickups ?? [];
+  game.bombs = cell?.bombs ?? [];
+}
+
+function updateChestsAndPickups(dt) {
+  const cell = currentCell();
+  const pushables = collectPushableEntities({
+    chest: game.chest,
+    pickups: game.pickups,
+    bombs: game.bombs,
+  });
+
+  if (game.chest) {
+    const spilled = game.chest.update(dt, game.room, game.player, pushables);
+    if (spilled.length) game.pickups.push(...spilled);
+  }
+
+  let statsChanged = false;
+  for (const pickup of game.pickups) {
+    const key = pickup.update(dt, game.room, game.player, pushables);
+    if (key && cell?.collectedPickups) {
+      cell.collectedPickups.add(key);
+      statsChanged = true;
+    }
+  }
+
+  game.pickups = game.pickups.filter((p) => !p.dead);
+  if (statsChanged) updateStatsHud(game.player.stats);
+}
 
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
-const roomNameEl = document.getElementById("room-name");
-const roomIdEl = document.getElementById("room-id");
 
 const input = createInputState();
 bindInput(input);
@@ -59,6 +91,8 @@ function boot() {
     gy: dungeon.start.gy,
     room: start.room,
     bombs: start.bombs,
+    chest: start.chest ?? null,
+    pickups: start.pickups ?? [],
     player: new AIsaac(spawn.x, spawn.y),
     tears: [],
     bursts: [],
@@ -78,8 +112,13 @@ function updateHud() {
   if (!game) return;
   const cell = currentCell();
   const entry = getRoomCatalogEntry(cell?.presetId);
-  roomNameEl.textContent = `${entry.name} (${game.gx}, ${game.gy})`;
-  roomIdEl.textContent = game.room.roomId;
+  updateRoomHud({
+    roomName: entry.name,
+    roomId: game.room.roomId,
+    gx: game.gx,
+    gy: game.gy,
+  });
+  updateStatsHud(game.player.stats);
 }
 
 function roomDrawOptions(gx, gy) {
@@ -98,6 +137,7 @@ function tryPlaceBombFromInput() {
   if (bomb) {
     game.bombs.push(bomb);
     game.bombCooldown = BOMB_PLACE_COOLDOWN;
+    updateStatsHud(game.player.stats);
   }
 }
 
@@ -109,9 +149,14 @@ function triggerExplosion(x, y) {
 
 function updateBombs(dt) {
   const liveBombs = game.bombs.filter((b) => b.alive);
+  const pushables = collectPushableEntities({
+    chest: game.chest,
+    pickups: game.pickups,
+    bombs: [],
+  });
 
   for (const bomb of liveBombs) {
-    const blast = bomb.update(dt, game.room, game.player, liveBombs);
+    const blast = bomb.update(dt, game.room, game.player, liveBombs, pushables);
     if (blast) {
       triggerExplosion(blast.x, blast.y);
     }
@@ -148,7 +193,7 @@ function finishRoomTransition() {
   game.gy = transition.gy;
   game.room = transition.room;
   const cell = getCurrentRoomData(game.dungeon, game.gx, game.gy);
-  game.bombs = cell?.bombs ?? [];
+  syncRoomEntities(cell);
   game.player.x = transition.entryX;
   game.player.y = transition.entryY;
   game.dungeon.visited.add(`${game.gx},${game.gy}`);
@@ -191,6 +236,7 @@ function update(dt) {
   if (tear) game.tears.push(tear);
 
   updateBombs(dt);
+  updateChestsAndPickups(dt);
 
   const transition = checkDoorTransition(
     game.player,
@@ -230,6 +276,12 @@ function update(dt) {
 }
 
 function drawWorldContents(layout, bombs = game.bombs, screenOverride = null) {
+  if (game.chest) game.chest.draw(ctx, layout);
+
+  for (const pickup of game.pickups) {
+    pickup.draw(ctx, layout);
+  }
+
   for (const bomb of bombs) {
     bomb.draw(ctx, layout);
   }
@@ -318,6 +370,7 @@ window.addEventListener("resize", resize);
 
 try {
   resize();
+  initStatsHud();
   boot();
   requestAnimationFrame(loop);
 } catch (error) {

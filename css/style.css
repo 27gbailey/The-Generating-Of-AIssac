@@ -21,32 +21,130 @@ body {
   pointer-events: none;
 }
 
-#hud {
+#stats-bar {
   position: absolute;
-  top: 12px;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px 12px;
+  background: rgba(8, 6, 4, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.hearts-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 28px);
+  grid-template-rows: repeat(2, 28px);
+  gap: 4px 6px;
+}
+
+.heart-slot {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.heart-slot svg {
+  width: 24px;
+  height: 24px;
+}
+
+.heart-full {
+  color: #d63b3b;
+}
+
+.heart-half {
+  color: #d63b3b;
+}
+
+.heart-empty {
+  color: #8a3030;
+}
+
+.heart-unowned {
+  color: rgba(120, 90, 90, 0.28);
+}
+
+.heart-inactive {
+  opacity: 0;
+}
+
+.resource-counters {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.resource-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 42px;
+}
+
+.resource-icon {
+  width: 22px;
+  height: 22px;
+  display: inline-block;
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+.resource-icon-penny {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='9' fill='%23c8a020' stroke='%238a6010' stroke-width='1.5'/%3E%3Ctext x='12' y='16' text-anchor='middle' font-size='11' font-family='system-ui,sans-serif' fill='%235a4010' font-weight='700'%3E¢%3C/text%3E%3C/svg%3E");
+}
+
+.resource-icon-key {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23d8c878' stroke='%238a7840' stroke-width='1' d='M7 10a5 5 0 1 1 9.9 1H14v2h2v2h-2v1h-2v-2H9v-2h1.9A4.98 4.98 0 0 1 7 10z'/%3E%3C/svg%3E");
+}
+
+.resource-icon-bomb {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='11' cy='13' r='7' fill='%233a3028' stroke='%23181010' stroke-width='1.5'/%3E%3Cpath d='M14 7l3-3 2 2-3 3' stroke='%23888' stroke-width='1.5' fill='none'/%3E%3Ccircle cx='17' cy='5' r='2' fill='%23f84'/%3E%3C/svg%3E");
+}
+
+.resource-count {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #f0e6d6;
+  min-width: 1ch;
+}
+
+#info-hud {
+  position: absolute;
+  bottom: 12px;
   left: 12px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
   max-width: min(90vw, 960px);
   font-size: 13px;
   line-height: 1.4;
 }
 
 #room-name {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 700;
   letter-spacing: 0.04em;
 }
 
 #controls {
   font-size: 12px;
-  opacity: 0.8;
+  opacity: 0.75;
 }
 
 #room-id {
   font-family: "SFMono-Regular", Consolas, monospace;
   font-size: 11px;
-  opacity: 0.75;
+  opacity: 0.65;
   word-break: break-all;
 }

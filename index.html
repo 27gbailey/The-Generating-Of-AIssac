@@ -8,7 +8,24 @@
 </head>
 <body>
   <div id="ui">
-    <div id="hud">
+    <div id="stats-bar">
+      <div id="hearts-grid" class="hearts-grid" aria-label="Health"></div>
+      <div id="resource-counters" class="resource-counters">
+        <div class="resource-item">
+          <span class="resource-icon resource-icon-penny" aria-hidden="true"></span>
+          <span id="penny-count" class="resource-count">0</span>
+        </div>
+        <div class="resource-item">
+          <span class="resource-icon resource-icon-key" aria-hidden="true"></span>
+          <span id="key-count" class="resource-count">0</span>
+        </div>
+        <div class="resource-item">
+          <span class="resource-icon resource-icon-bomb" aria-hidden="true"></span>
+          <span id="bomb-count" class="resource-count">1</span>
+        </div>
+      </div>
+    </div>
+    <div id="info-hud">
       <span id="room-name">Room</span>
       <span id="controls">WASD — body &nbsp;|&nbsp; Arrows — aim &amp; shoot &nbsp;|&nbsp; E — place bomb</span>
       <span id="room-id"></span>

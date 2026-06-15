@@ -4,6 +4,7 @@ import {
   BOMB_RADIUS,
 } from "./constants.js";
 import { circleHitsRoom, circleHitsRoomExcluding } from "./roomSpace.js";
+import { resolveCircleCollisions } from "./pushablePhysics.js";
 
 export class Bomb {
   constructor(x, y) {
@@ -16,7 +17,7 @@ export class Bomb {
     this.alive = true;
   }
 
-  update(dt, room, player, otherBombs) {
+  update(dt, room, player, otherBombs, pushables = []) {
     if (!this.alive) return null;
 
     this.fuse -= dt;
@@ -27,12 +28,13 @@ export class Bomb {
 
     this.applyPlayerPush(player);
     this.resolveBombCollisions(otherBombs);
+    resolveCircleCollisions(this, pushables, 0.5);
 
     const friction = Math.exp(-4.5 * dt);
     this.vx *= friction;
     this.vy *= friction;
 
-    this.moveWithCollision(dt, room, otherBombs);
+    this.moveWithCollision(dt, room, otherBombs, pushables);
     return null;
   }
 
@@ -82,20 +84,20 @@ export class Bomb {
     }
   }
 
-  moveWithCollision(dt, room, otherBombs) {
+  moveWithCollision(dt, room, otherBombs, pushables = []) {
     const steps = 2;
     const stepDt = dt / steps;
 
     for (let i = 0; i < steps; i++) {
       const nextX = this.x + this.vx * stepDt;
-      if (!this.hitsSolid(nextX, this.y, room, otherBombs)) {
+      if (!this.hitsSolid(nextX, this.y, room, otherBombs, pushables)) {
         this.x = nextX;
       } else {
         this.vx *= -0.25;
       }
 
       const nextY = this.y + this.vy * stepDt;
-      if (!this.hitsSolid(this.x, nextY, room, otherBombs)) {
+      if (!this.hitsSolid(this.x, nextY, room, otherBombs, pushables)) {
         this.y = nextY;
       } else {
         this.vy *= -0.25;
@@ -103,11 +105,17 @@ export class Bomb {
     }
   }
 
-  hitsSolid(x, y, room, otherBombs) {
+  hitsSolid(x, y, room, otherBombs, pushables = []) {
     if (circleHitsRoom(x, y, this.radius, room)) return true;
     for (const other of otherBombs) {
       if (other === this || !other.alive) continue;
       if (Math.hypot(x - other.x, y - other.y) < this.radius + other.radius - 2) {
+        return true;
+      }
+    }
+    for (const entity of pushables) {
+      if (entity === this || entity.dead || entity.alive === false) continue;
+      if (Math.hypot(x - entity.x, y - entity.y) < this.radius + entity.radius - 2) {
         return true;
       }
     }
@@ -186,9 +194,11 @@ function canPlaceBombAt(x, y, room, bombs, player) {
 export function tryPlaceBomb(player, room, bombs) {
   const live = bombs.filter((b) => b.alive);
   if (live.length >= BOMB_MAX_PER_ROOM) return null;
+  if (!player.stats || player.stats.bombs <= 0) return null;
 
   for (const point of bombPlacementCandidates(player)) {
     if (canPlaceBombAt(point.x, point.y, room, live, player)) {
+      player.stats.bombs -= 1;
       return new Bomb(point.x, point.y);
     }
   }

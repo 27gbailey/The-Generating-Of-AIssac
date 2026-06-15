@@ -38,11 +38,25 @@ export const BOMB_FUSE = 2.6;
 export const BOMB_MAX_PER_ROOM = 3;
 export const BOMB_PLACE_COOLDOWN = 0.45;
 
-export const EXPLOSION_RADIUS_X = 78;
-export const EXPLOSION_RADIUS_Y = 46;
+export const EXPLOSION_RADIUS_X = 102;
+export const EXPLOSION_RADIUS_Y = 96;
 export const EXPLOSION_KNOCKBACK = 480;
 
+/** Larger corner radius for drawing objects (hitbox stays square-ish). */
+export const OBJECT_VISUAL_RADIUS = 22;
+
+export const MAX_HEART_CONTAINERS = 12;
+export const START_HEART_CONTAINERS = 3;
+export const START_BOMBS = 1;
+
 export const BARREL_HITS_TO_DESTROY = 3;
+
+export const PICKUP_PENNY_RADIUS = 9;
+export const PICKUP_KEY_RADIUS = 11;
+export const PICKUP_BOMB_RADIUS = 10;
+export const PICKUP_HALF_HEART_RADIUS = 10;
+export const PICKUP_FULL_HEART_RADIUS = 11;
+export const CHEST_RADIUS = 22;
 
 export const DIRECTIONS = {
   north: { dx: 0, dy: -1, opposite: "south" },
