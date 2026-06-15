@@ -20,22 +20,41 @@ const roomIdEl = document.getElementById("room-id");
 const input = createInputState();
 bindInput(input);
 
-const dungeon = generateDungeon();
-const start = getCurrentRoomData(dungeon, dungeon.start.gx, dungeon.start.gy);
-const spawn = getSpawnPosition(start.room);
-
-const game = {
-  dungeon,
-  gx: dungeon.start.gx,
-  gy: dungeon.start.gy,
-  room: start.room,
-  player: new AIsaac(spawn.x, spawn.y),
-  tears: [],
-  bursts: [],
-  transitionCooldown: 0,
-};
-
+let game = null;
 let lastTime = performance.now();
+
+function showError(message) {
+  ctx.fillStyle = "#0a0806";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = "#e8dcc8";
+  ctx.font = "16px system-ui, sans-serif";
+  ctx.fillText("Failed to start game:", 24, 40);
+  ctx.font = "13px monospace";
+  ctx.fillText(String(message), 24, 68, canvas.width - 48);
+}
+
+function boot() {
+  const dungeon = generateDungeon();
+  const start = getCurrentRoomData(dungeon, dungeon.start.gx, dungeon.start.gy);
+  if (!start?.room) {
+    throw new Error("Dungeon start room is missing.");
+  }
+
+  const spawn = getSpawnPosition(start.room);
+
+  game = {
+    dungeon,
+    gx: dungeon.start.gx,
+    gy: dungeon.start.gy,
+    room: start.room,
+    player: new AIsaac(spawn.x, spawn.y),
+    tears: [],
+    bursts: [],
+    transitionCooldown: 0,
+  };
+
+  updateHud();
+}
 
 function resize() {
   canvas.width = window.innerWidth;
@@ -43,7 +62,9 @@ function resize() {
 }
 
 function updateHud() {
-  const entry = getRoomCatalogEntry();
+  if (!game) return;
+  const cell = getCurrentRoomData(game.dungeon, game.gx, game.gy);
+  const entry = getRoomCatalogEntry(cell?.presetId);
   roomNameEl.textContent = `${entry.name} (${game.gx}, ${game.gy})`;
   roomIdEl.textContent = game.room.roomId;
 }
@@ -62,11 +83,13 @@ function changeRoom(transition) {
   game.player.vx = 0;
   game.player.vy = 0;
 
-  dungeon.visited.add(`${game.gx},${game.gy}`);
+  game.dungeon.visited.add(`${game.gx},${game.gy}`);
   updateHud();
 }
 
 function update(dt) {
+  if (!game) return;
+
   if (game.transitionCooldown > 0) {
     game.transitionCooldown -= dt;
   } else {
@@ -101,6 +124,7 @@ function update(dt) {
 function draw() {
   ctx.fillStyle = "#0a0806";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
+  if (!game) return;
 
   const layout = getRoomScreenLayout(canvas.width / 2, canvas.height / 2);
   drawRoom(ctx, game.room, canvas.width / 2, canvas.height / 2);
@@ -128,6 +152,12 @@ function loop(timestamp) {
 
 window.addEventListener("resize", resize);
 
-resize();
-updateHud();
-requestAnimationFrame(loop);
+try {
+  resize();
+  boot();
+  requestAnimationFrame(loop);
+} catch (error) {
+  console.error(error);
+  resize();
+  showError(error.message);
+}

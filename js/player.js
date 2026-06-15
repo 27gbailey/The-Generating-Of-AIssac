@@ -117,7 +117,7 @@ export class AIsaac {
     ctx.strokeStyle = "#2a2018";
     ctx.lineWidth = 1.5;
     ctx.beginPath();
-    ctx.roundRect(x - 3.5, y, 7, 11, 3);
+    ctx.rect(x - 3.5, y, 7, 11);
     ctx.fill();
     ctx.stroke();
   }
@@ -127,13 +127,13 @@ export class AIsaac {
     ctx.strokeStyle = "#4a6888";
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.roundRect(-11, 0, 22, 18, 6);
+    ctx.rect(-11, 0, 22, 18);
     ctx.fill();
     ctx.stroke();
 
     ctx.fillStyle = "#6a94b8";
     ctx.beginPath();
-    ctx.roundRect(-8, 4, 16, 10, 4);
+    ctx.rect(-8, 4, 16, 10);
     ctx.fill();
   }
 

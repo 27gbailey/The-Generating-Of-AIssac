@@ -1,30 +1,33 @@
 import { TILE } from "./constants.js";
 import { createEmptyGrid, decodeRoomId, encodeRoomId } from "./roomId.js";
 
-function hashSeed(gx, gy, seed) {
-  return ((gx * 73856093) ^ (gy * 19349663) ^ seed) >>> 0;
-}
+export const DEFAULT_PRESET = "empty";
 
-function scatterRocks(grid, gx, gy, seed) {
-  const h = hashSeed(gx, gy, seed);
-  const count = h % 4;
+export const ROOM_PRESETS = {
+  empty: {
+    name: "Empty Room",
+    buildGrid() {
+      return createEmptyGrid(TILE.FLOOR);
+    },
+  },
+};
 
-  for (let i = 0; i < count; i++) {
-    const tx = 1 + ((h >> (i * 3)) % (grid[0].length - 2));
-    const ty = 1 + ((h >> (i * 5 + 2)) % (grid.length - 2));
-    if (grid[ty][tx] === TILE.FLOOR) {
-      grid[ty][tx] = TILE.ROCK;
-    }
+export function buildRoomFromPreset(presetId, doors) {
+  const preset = ROOM_PRESETS[presetId];
+  if (!preset) {
+    throw new Error(`Unknown room preset "${presetId}".`);
   }
+
+  const roomId = encodeRoomId(preset.buildGrid(), doors);
+  const room = decodeRoomId(roomId);
+  return { ...room, presetId };
 }
 
-export function createRoomFromDoors(doors, gx, gy, seed = 1) {
-  const grid = createEmptyGrid(TILE.FLOOR);
-  scatterRocks(grid, gx, gy, seed);
-  const roomId = encodeRoomId(grid, doors);
-  return decodeRoomId(roomId);
+export function getRoomCatalogEntry(presetId = DEFAULT_PRESET) {
+  return ROOM_PRESETS[presetId] ?? { name: "Unknown Room" };
 }
 
-export function getRoomCatalogEntry() {
-  return { name: "Dungeon Room" };
+export function getPresetRoomId(presetId, doors) {
+  const preset = ROOM_PRESETS[presetId];
+  return encodeRoomId(preset.buildGrid(), doors);
 }

@@ -4,7 +4,7 @@ import {
   FLOOR_GRID_SIZE,
   TILE_SIZE,
 } from "./constants.js";
-import { createRoomFromDoors } from "./rooms.js";
+import { DEFAULT_PRESET, buildRoomFromPreset } from "./rooms.js";
 import { getPlayAreaSize } from "./roomSpace.js";
 
 function mulberry32(seed) {
@@ -43,7 +43,7 @@ export function generateDungeon(seed = Date.now()) {
   const queue = [`${startX},${startY}`];
   cells[`${startX},${startY}`] = { gx: startX, gy: startY, isStart: true };
 
-  const targetRooms = 26 + Math.floor(rand() * 14);
+  const targetRooms = 8 + Math.floor(rand() * 8);
 
   while (queue.length > 0 && Object.keys(cells).length < targetRooms) {
     const key = queue.splice(Math.floor(rand() * queue.length), 1)[0];
@@ -61,10 +61,8 @@ export function generateDungeon(seed = Date.now()) {
       const nKey = `${nx},${ny}`;
       if (cells[nKey]) continue;
 
-      if (rand() < 0.62 || Object.keys(cells).length < 8) {
-        cells[nKey] = { gx: nx, gy: ny, isStart: false };
-        queue.push(nKey);
-      }
+      cells[nKey] = { gx: nx, gy: ny, isStart: false };
+      queue.push(nKey);
     }
   }
 
@@ -74,7 +72,8 @@ export function generateDungeon(seed = Date.now()) {
     rooms[`${cell.gx},${cell.gy}`] = {
       ...cell,
       doors,
-      room: createRoomFromDoors(doors, cell.gx, cell.gy, seed),
+      presetId: DEFAULT_PRESET,
+      room: buildRoomFromPreset(DEFAULT_PRESET, doors),
     };
   }
 

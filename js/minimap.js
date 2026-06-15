@@ -14,10 +14,8 @@ export function drawMinimap(ctx, canvas, dungeon, currentGx, currentGy) {
   ctx.fillStyle = "rgba(0, 0, 0, 0.55)";
   ctx.strokeStyle = "rgba(255, 255, 255, 0.15)";
   ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.roundRect(x - 8, y - 8, mapWidth + 16, mapHeight + 16, 8);
-  ctx.fill();
-  ctx.stroke();
+  ctx.fillRect(x - 8, y - 8, mapWidth + 16, mapHeight + 16);
+  ctx.strokeRect(x - 8, y - 8, mapWidth + 16, mapHeight + 16);
 
   ctx.fillStyle = "rgba(255, 255, 255, 0.7)";
   ctx.font = "11px system-ui, sans-serif";
