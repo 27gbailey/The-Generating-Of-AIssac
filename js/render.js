@@ -16,15 +16,14 @@ import {
 } from "./roomAmbience.js";
 
 const TILE_COLORS = {
-  [TILE.FLOOR]: "#8a7968",
+  [TILE.FLOOR]: "#b5a690",
   [TILE.WALL]: "#1a1410",
-  [TILE.ROCK]: "#6b6b6b",
+  [TILE.ROCK]: "#7a7a7a",
   [TILE.BLOOD]: "#5a1a1a",
 };
 
 const WALL_TOP = "#2e241c";
 const WALL_FACE = "#15100c";
-const WALL_SHADOW = "#0a0705";
 const DOOR_FRAME = "#4a3428";
 const DOOR_INNER = "#2a1f18";
 const GRID_LINE = "rgba(255, 255, 255, 0.05)";
@@ -155,17 +154,14 @@ function drawWalls(ctx, originX, originY, width, height, room, isBoss = false) {
   const floorW = ROOM_WIDTH * TILE_SIZE;
   const floorH = ROOM_HEIGHT * TILE_SIZE;
 
-  ctx.fillStyle = WALL_SHADOW;
-  ctx.fillRect(originX, originY, width, height);
-
   textureBand(ctx, originX, originY, width, WALL_THICKNESS, true);
   textureBand(ctx, originX, originY + height - WALL_THICKNESS, width, WALL_THICKNESS, true);
   textureBand(ctx, originX, originY, WALL_THICKNESS, height, false);
   textureBand(ctx, originX + width - WALL_THICKNESS, originY, WALL_THICKNESS, height, false);
 
-  ctx.fillStyle = "rgba(0,0,0,0.18)";
-  ctx.fillRect(floorX, floorY + floorH - 3, floorW, 3);
-  ctx.fillRect(floorX + floorW - 3, floorY, 3, floorH);
+  ctx.fillStyle = "rgba(0,0,0,0.12)";
+  ctx.fillRect(floorX, floorY + floorH - 4, floorW, 4);
+  ctx.fillRect(floorX + floorW - 4, floorY, 4, floorH);
 
   if (isBoss) {
     ctx.fillStyle = "rgba(90, 15, 15, 0.45)";
@@ -223,12 +219,12 @@ export function drawRoom(ctx, room, offsetX, offsetY, options = {}) {
     }
   }
 
+  drawWalls(ctx, originX, originY, width, height, room, options.isBoss);
+
   if (options.cellKey && options.dungeonSeed != null) {
     const ambience = getAmbience(options.cellKey, options.dungeonSeed);
     drawRoomAmbience(ctx, ambience, floorX, floorY, floorW, floorH);
   }
-
-  drawWalls(ctx, originX, originY, width, height, room, options.isBoss);
 
   return { originX, originY, width, height, floorX, floorY, floorW, floorH };
 }

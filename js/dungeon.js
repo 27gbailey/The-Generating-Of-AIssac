@@ -171,7 +171,7 @@ function ensureMinimumConnectivity(cells, rand) {
     let doors = computeDoors(cell, cells, cell.presetId);
     if (DOOR_WALLS.some((wall) => doors[wall])) continue;
 
-    if (cell.isBoss) continue;
+    if (cell.isStart || cell.isBoss) continue;
 
     cell.presetId = pickPresetForCell(rand, needed);
     doors = computeDoors(cell, cells, cell.presetId);
@@ -204,11 +204,16 @@ export function generateDungeon(seed = Date.now()) {
   const bossCell = pickBossCell(cells, startX, startY);
   const bossKey = `${bossCell.gx},${bossCell.gy}`;
 
+  const startKey = `${startX},${startY}`;
+
   for (const cell of Object.values(cells)) {
     const key = `${cell.gx},${cell.gy}`;
     const required = requiredOpenWalls(intendedNeighbors(cells, cell.gx, cell.gy));
 
-    if (key === bossKey) {
+    if (key === startKey) {
+      cell.presetId = "empty";
+      cell.isBoss = false;
+    } else if (key === bossKey) {
       cell.presetId = BOSS_PRESET;
       cell.isBoss = true;
     } else {
