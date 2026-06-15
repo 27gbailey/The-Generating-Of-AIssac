@@ -5,15 +5,14 @@
 }
 
 body {
-  background: #0a0f0a;
+  background: #0a0806;
   overflow: hidden;
   font-family: "Segoe UI", system-ui, sans-serif;
-  color: #e8f5e9;
+  color: #e8dcc8;
 }
 
 #game {
   display: block;
-  cursor: crosshair;
 }
 
 #ui {
@@ -27,62 +26,22 @@ body {
   top: 12px;
   left: 12px;
   display: flex;
-  gap: 20px;
-  font-size: 14px;
-  font-weight: 600;
-  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8);
-  letter-spacing: 0.03em;
-}
-
-#overlay {
-  position: absolute;
-  inset: 0;
-  display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  background: radial-gradient(ellipse at center, rgba(10, 30, 10, 0.85) 0%, rgba(0, 0, 0, 0.92) 100%);
-  pointer-events: auto;
+  gap: 8px;
+  max-width: min(90vw, 960px);
+  font-size: 13px;
+  line-height: 1.4;
 }
 
-#overlay.hidden {
-  display: none;
+#room-name {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
 }
 
-#overlay h1 {
-  font-size: 2.8rem;
-  margin-bottom: 12px;
-  color: #a5d6a7;
-  text-shadow: 0 0 30px rgba(76, 175, 80, 0.5);
-}
-
-#overlay p {
-  margin-bottom: 8px;
-  opacity: 0.85;
-  text-align: center;
-  line-height: 1.6;
-}
-
-.controls {
-  font-size: 0.9rem;
-  margin: 16px 0 24px;
-  opacity: 0.7;
-}
-
-#start-btn {
-  padding: 12px 32px;
-  font-size: 1.1rem;
-  font-weight: 600;
-  border: none;
-  border-radius: 8px;
-  background: linear-gradient(135deg, #2e7d32, #1b5e20);
-  color: #fff;
-  cursor: pointer;
-  box-shadow: 0 4px 20px rgba(46, 125, 50, 0.4);
-  transition: transform 0.15s, box-shadow 0.15s;
-}
-
-#start-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 28px rgba(46, 125, 50, 0.55);
+#room-id {
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 11px;
+  opacity: 0.75;
+  word-break: break-all;
 }

@@ -1,16 +1,30 @@
 # The Generating Of AIssac
 
-A browser-based roguelike shooter with procedurally generated terrain, 8-direction movement, and bullet combat.
+A room-based roguelike built on encoded room IDs.
 
-## Play locally
+## Room format
 
-Open `index.html` in a browser, or serve the folder with any static file server.
+Each room is a **13-wide by 7-tall** tile grid. Every tile uses a **2-digit object code**. Four extra digits encode doors on the **north, east, south, and west** walls (`0` = no door, `1` = door).
 
-## Controls
+Total room ID length: `(13 × 7 × 2) + 4 = 186` characters.
 
-- **WASD / Arrow keys** — move (8 directions)
-- **Mouse** — aim
-- **Click / Space** — shoot
+### Tile codes
+
+| Code | Object |
+|------|--------|
+| `00` | Floor |
+| `01` | Wall |
+| `02` | Rock |
+
+### Door digits
+
+Order: `north`, `east`, `south`, `west`
+
+Example: `0010` = door on the south wall only.
+
+## Run locally
+
+Open `index.html` in a browser.
 
 ## Repository
 
