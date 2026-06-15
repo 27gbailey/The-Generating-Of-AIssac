@@ -9,25 +9,27 @@ export function createRoomAmbience(gx, gy, dungeonSeed) {
   const dust = [];
   const lights = [];
 
-  for (let i = 0; i < 18; i++) {
+  for (let i = 0; i < 28; i++) {
     const h = hash(i, seed, 91);
     dust.push({
       x: (h % 1000) / 1000,
       y: ((h >> 10) % 1000) / 1000,
-      size: 1 + (h % 3),
+      size: 1.5 + (h % 4),
       drift: ((h >> 4) % 100) / 100,
-      speed: 8 + (h % 12),
+      speed: 14 + (h % 18),
+      twinkle: ((h >> 6) % 100) / 100,
     });
   }
 
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < 7; i++) {
     const h = hash(i + 40, seed, 77);
     lights.push({
-      x: 0.15 + ((h % 700) / 1000) * 0.7,
-      y: 0.08 + ((h >> 8) % 500) / 1000,
-      w: 0.12 + (h % 80) / 400,
-      h: 0.18 + ((h >> 5) % 90) / 300,
-      alpha: 0.05 + (h % 30) / 400,
+      x: 0.1 + ((h % 800) / 1000) * 0.8,
+      y: 0.05 + ((h >> 8) % 600) / 1000,
+      w: 0.14 + (h % 90) / 350,
+      h: 0.2 + ((h >> 5) % 100) / 280,
+      alpha: 0.1 + (h % 40) / 250,
+      pulse: ((h >> 3) % 100) / 100,
     });
   }
 
@@ -37,8 +39,8 @@ export function createRoomAmbience(gx, gy, dungeonSeed) {
 export function updateRoomAmbience(ambience, dt) {
   ambience.time += dt;
   for (const speck of ambience.dust) {
-    speck.y -= speck.speed * dt * 0.004;
-    speck.x += Math.sin(ambience.time * 0.7 + speck.drift * 10) * dt * 0.01;
+    speck.y -= speck.speed * dt * 0.012;
+    speck.x += Math.sin(ambience.time * 0.9 + speck.drift * 10) * dt * 0.025;
     if (speck.y < -0.05) speck.y = 1.05;
     if (speck.x < -0.05) speck.x = 1.05;
     if (speck.x > 1.05) speck.x = -0.05;
@@ -51,34 +53,41 @@ export function drawRoomAmbience(ctx, ambience, floorX, floorY, floorW, floorH) 
   ctx.rect(floorX, floorY, floorW, floorH);
   ctx.clip();
 
+  ctx.globalCompositeOperation = "screen";
+
   for (const light of ambience.lights) {
+    const pulse = 0.85 + Math.sin(ambience.time * 0.6 + light.pulse * Math.PI * 2) * 0.15;
     const lx = floorX + light.x * floorW;
     const ly = floorY + light.y * floorH;
     const lw = light.w * floorW;
     const lh = light.h * floorH;
+    const alpha = light.alpha * pulse;
     const grad = ctx.createRadialGradient(
       lx + lw / 2,
-      ly,
+      ly + lh * 0.35,
       0,
       lx + lw / 2,
-      ly + lh,
-      Math.max(lw, lh)
+      ly + lh * 0.65,
+      Math.max(lw, lh) * 0.85
     );
-    grad.addColorStop(0, `rgba(255, 236, 180, ${light.alpha + 0.04})`);
-    grad.addColorStop(1, "rgba(255, 236, 180, 0)");
+    grad.addColorStop(0, `rgba(255, 244, 200, ${alpha + 0.08})`);
+    grad.addColorStop(0.55, `rgba(255, 230, 160, ${alpha * 0.55})`);
+    grad.addColorStop(1, "rgba(255, 220, 140, 0)");
     ctx.fillStyle = grad;
-    ctx.fillRect(lx, ly, lw, lh);
+    ctx.fillRect(lx - lw * 0.15, ly - lh * 0.1, lw * 1.3, lh * 1.2);
   }
 
+  ctx.globalCompositeOperation = "source-over";
+
   for (const speck of ambience.dust) {
-    const alpha = 0.08 + (speck.size / 5) * 0.08;
-    ctx.fillStyle = `rgba(220, 210, 190, ${alpha})`;
-    ctx.fillRect(
-      floorX + speck.x * floorW,
-      floorY + speck.y * floorH,
-      speck.size,
-      speck.size
-    );
+    const twinkle = 0.7 + Math.sin(ambience.time * 2.2 + speck.twinkle * 12) * 0.3;
+    const alpha = (0.18 + (speck.size / 6) * 0.12) * twinkle;
+    const px = floorX + speck.x * floorW;
+    const py = floorY + speck.y * floorH;
+    ctx.fillStyle = `rgba(255, 248, 230, ${alpha})`;
+    ctx.beginPath();
+    ctx.arc(px, py, speck.size, 0, Math.PI * 2);
+    ctx.fill();
   }
 
   ctx.restore();

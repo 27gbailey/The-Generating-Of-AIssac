@@ -1,5 +1,7 @@
 import {
   DOOR_WALLS,
+  ROCK_HITBOX_INSET,
+  ROCK_HITBOX_RADIUS,
   ROOM_HEIGHT,
   ROOM_WIDTH,
   TILE,
@@ -39,6 +41,28 @@ export function playToScreen(x, y, layout) {
 
 function isSolidTile(code) {
   return code === TILE.WALL || code === TILE.ROCK;
+}
+
+function rockHitbox(tx, ty) {
+  const inset = ROCK_HITBOX_INSET;
+  return {
+    left: tx * TILE_SIZE + inset,
+    top: ty * TILE_SIZE + inset,
+    width: TILE_SIZE - inset * 2,
+    height: TILE_SIZE - inset * 2,
+    radius: ROCK_HITBOX_RADIUS,
+  };
+}
+
+function circleIntersectsRoundedRect(cx, cy, radius, rect) {
+  const centerX = rect.left + rect.width / 2;
+  const centerY = rect.top + rect.height / 2;
+  const halfW = rect.width / 2 - rect.radius;
+  const halfH = rect.height / 2 - rect.radius;
+  const localX = Math.abs(cx - centerX) - halfW;
+  const localY = Math.abs(cy - centerY) - halfH;
+  const outside = Math.hypot(Math.max(localX, 0), Math.max(localY, 0));
+  return outside - rect.radius <= radius;
 }
 
 export function getTileAtPlayPos(room, x, y) {
@@ -90,7 +114,11 @@ export function circleHitsRoom(cx, cy, radius, room) {
     for (let tx = minTx; tx <= maxTx; tx++) {
       const code = room.grid[ty][tx];
       if (!isSolidTile(code)) continue;
-      if (circleIntersectsTile(cx, cy, radius, tx, ty)) return true;
+      if (code === TILE.ROCK) {
+        if (circleIntersectsRoundedRect(cx, cy, radius, rockHitbox(tx, ty))) return true;
+      } else if (circleIntersectsTile(cx, cy, radius, tx, ty)) {
+        return true;
+      }
     }
   }
 

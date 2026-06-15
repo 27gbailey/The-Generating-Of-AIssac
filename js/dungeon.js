@@ -3,7 +3,12 @@ import {
   DOOR_WALLS,
   FLOOR_GRID_SIZE,
 } from "./constants.js";
-import { DEFAULT_PRESET, buildRoomFromPreset } from "./rooms.js";
+import {
+  BOSS_PRESET,
+  buildRoomFromPreset,
+  getBlockedWalls,
+  pickPresetForCell,
+} from "./rooms.js";
 import { getPlayAreaSize } from "./roomSpace.js";
 import { isInDoorGap } from "./doors.js";
 
@@ -24,15 +29,6 @@ function shuffle(list, rand) {
     [copy[i], copy[j]] = [copy[j], copy[i]];
   }
   return copy;
-}
-
-function doorsForCell(cells, gx, gy) {
-  const doors = { north: false, east: false, south: false, west: false };
-  for (const wall of DOOR_WALLS) {
-    const { dx, dy } = DIRECTIONS[wall];
-    doors[wall] = Boolean(cells[`${gx + dx},${gy + dy}`]);
-  }
-  return doors;
 }
 
 function neighborCount(cells, gx, gy) {
@@ -74,6 +70,118 @@ function pickExpansionCell(cells, rand) {
   return occupied[Math.floor(rand() * occupied.length)];
 }
 
+function intendedNeighbors(cells, gx, gy) {
+  const neighbors = {};
+  for (const wall of DOOR_WALLS) {
+    const { dx, dy } = DIRECTIONS[wall];
+    neighbors[wall] = Boolean(cells[`${gx + dx},${gy + dy}`]);
+  }
+  return neighbors;
+}
+
+function requiredOpenWalls(intended) {
+  return DOOR_WALLS.filter((wall) => intended[wall]);
+}
+
+function bfsDistance(cells, sx, sy, tx, ty) {
+  const queue = [{ gx: sx, gy: sy, dist: 0 }];
+  const visited = new Set([`${sx},${sy}`]);
+
+  while (queue.length > 0) {
+    const current = queue.shift();
+    if (current.gx === tx && current.gy === ty) return current.dist;
+
+    for (const wall of DOOR_WALLS) {
+      const { dx, dy } = DIRECTIONS[wall];
+      const key = `${current.gx + dx},${current.gy + dy}`;
+      if (!cells[key] || visited.has(key)) continue;
+      visited.add(key);
+      queue.push({ gx: current.gx + dx, gy: current.gy + dy, dist: current.dist + 1 });
+    }
+  }
+  return 0;
+}
+
+function pickBossCell(cells, startX, startY) {
+  const queue = [{ gx: startX, gy: startY, dist: 0 }];
+  const visited = new Set([`${startX},${startY}`]);
+  let farthest = { gx: startX, gy: startY, dist: 0 };
+
+  while (queue.length > 0) {
+    const current = queue.shift();
+    if (current.dist > farthest.dist) farthest = current;
+
+    for (const wall of DOOR_WALLS) {
+      const { dx, dy } = DIRECTIONS[wall];
+      const key = `${current.gx + dx},${current.gy + dy}`;
+      if (!cells[key] || visited.has(key)) continue;
+      visited.add(key);
+      queue.push({ gx: current.gx + dx, gy: current.gy + dy, dist: current.dist + 1 });
+    }
+  }
+
+  const deadEnds = Object.values(cells).filter(
+    (cell) => neighborCount(cells, cell.gx, cell.gy) === 1
+  );
+  const farDeadEnds = deadEnds.filter((cell) => {
+    const dist = bfsDistance(cells, startX, startY, cell.gx, cell.gy);
+    return dist >= Math.max(2, farthest.dist - 1);
+  });
+
+  if (farDeadEnds.length > 0) {
+    return farDeadEnds[Math.floor(farDeadEnds.length / 2)];
+  }
+  return farthest;
+}
+
+function presetGrid(presetId) {
+  return buildRoomFromPreset(presetId, {
+    north: false,
+    east: false,
+    south: false,
+    west: false,
+  }).grid;
+}
+
+function computeDoors(cell, cells, presetId) {
+  const blocked = getBlockedWalls(presetGrid(presetId));
+  const doors = { north: false, east: false, south: false, west: false };
+
+  for (const wall of DOOR_WALLS) {
+    const { dx, dy, opposite } = DIRECTIONS[wall];
+    if (!cells[`${cell.gx + dx},${cell.gy + dy}`]) continue;
+    if (blocked[wall]) continue;
+
+    const neighbor = cells[`${cell.gx + dx},${cell.gy + dy}`];
+    const neighborBlocked = getBlockedWalls(presetGrid(neighbor.presetId ?? "empty"));
+    if (neighborBlocked[opposite]) continue;
+
+    doors[wall] = true;
+  }
+
+  return doors;
+}
+
+function ensureMinimumConnectivity(cells, rand) {
+  for (const cell of Object.values(cells)) {
+    const intended = intendedNeighbors(cells, cell.gx, cell.gy);
+    const needed = requiredOpenWalls(intended);
+    if (needed.length === 0) continue;
+
+    let doors = computeDoors(cell, cells, cell.presetId);
+    if (DOOR_WALLS.some((wall) => doors[wall])) continue;
+
+    if (cell.isBoss) continue;
+
+    cell.presetId = pickPresetForCell(rand, needed);
+    doors = computeDoors(cell, cells, cell.presetId);
+
+    if (!DOOR_WALLS.some((wall) => doors[wall])) {
+      cell.presetId = "empty";
+    }
+  }
+}
+
 export function generateDungeon(seed = Date.now()) {
   const rand = mulberry32(seed);
   const cells = {};
@@ -89,19 +197,35 @@ export function generateDungeon(seed = Date.now()) {
     const cell = pickExpansionCell(cells, rand);
     const options = expandableDirections(cells, cell.gx, cell.gy, rand);
     if (options.length === 0) continue;
-
     const pick = options[0];
     cells[`${pick.nx},${pick.ny}`] = { gx: pick.nx, gy: pick.ny, isStart: false };
   }
 
+  const bossCell = pickBossCell(cells, startX, startY);
+  const bossKey = `${bossCell.gx},${bossCell.gy}`;
+
+  for (const cell of Object.values(cells)) {
+    const key = `${cell.gx},${cell.gy}`;
+    const required = requiredOpenWalls(intendedNeighbors(cells, cell.gx, cell.gy));
+
+    if (key === bossKey) {
+      cell.presetId = BOSS_PRESET;
+      cell.isBoss = true;
+    } else {
+      cell.presetId = pickPresetForCell(rand, required);
+      cell.isBoss = false;
+    }
+  }
+
+  ensureMinimumConnectivity(cells, rand);
+
   const rooms = {};
   for (const cell of Object.values(cells)) {
-    const doors = doorsForCell(cells, cell.gx, cell.gy);
+    const doors = computeDoors(cell, cells, cell.presetId);
     rooms[`${cell.gx},${cell.gy}`] = {
       ...cell,
       doors,
-      presetId: DEFAULT_PRESET,
-      room: buildRoomFromPreset(DEFAULT_PRESET, doors),
+      room: buildRoomFromPreset(cell.presetId, doors),
     };
   }
 
@@ -109,16 +233,13 @@ export function generateDungeon(seed = Date.now()) {
     seed,
     rooms,
     start: { gx: startX, gy: startY },
+    boss: { gx: bossCell.gx, gy: bossCell.gy },
     visited: new Set([`${startX},${startY}`]),
   };
 }
 
 export function getCurrentRoomData(dungeon, gx, gy) {
   return dungeon.rooms[`${gx},${gy}`] ?? null;
-}
-
-function inDoorGapForTransition(wall, x, y, width, height) {
-  return isInDoorGap(wall, x, y, width, height);
 }
 
 export function checkDoorTransition(player, room, gx, gy, dungeon) {
@@ -134,7 +255,7 @@ export function checkDoorTransition(player, room, gx, gy, dungeon) {
 
   for (const check of checks) {
     if (!room.doors[check.wall] || !check.test) continue;
-    if (!inDoorGapForTransition(check.wall, player.x, player.y, width, height)) continue;
+    if (!isInDoorGap(check.wall, player.x, player.y, width, height)) continue;
 
     const next = getCurrentRoomData(dungeon, check.nx, check.ny);
     if (!next) continue;

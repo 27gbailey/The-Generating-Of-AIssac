@@ -74,9 +74,11 @@ function updateHud() {
 }
 
 function roomDrawOptions(gx, gy) {
+  const cell = getCurrentRoomData(game.dungeon, gx, gy);
   return {
     cellKey: `${gx},${gy}`,
     dungeonSeed: game.dungeon.seed,
+    isBoss: cell?.isBoss ?? false,
   };
 }
 

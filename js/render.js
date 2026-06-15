@@ -1,5 +1,7 @@
 import {
   DOOR_WALLS,
+  ROCK_HITBOX_INSET,
+  ROCK_HITBOX_RADIUS,
   ROOM_HEIGHT,
   ROOM_WIDTH,
   TILE,
@@ -14,9 +16,10 @@ import {
 } from "./roomAmbience.js";
 
 const TILE_COLORS = {
-  [TILE.FLOOR]: "#3d2f24",
+  [TILE.FLOOR]: "#8a7968",
   [TILE.WALL]: "#1a1410",
   [TILE.ROCK]: "#6b6b6b",
+  [TILE.BLOOD]: "#5a1a1a",
 };
 
 const WALL_TOP = "#2e241c";
@@ -35,7 +38,7 @@ function roomPixelSize() {
   };
 }
 
-function getAmbience(room, cellKey, dungeonSeed) {
+function getAmbience(cellKey, dungeonSeed) {
   if (!ambienceCache.has(cellKey)) {
     const [gx, gy] = cellKey.split(",").map(Number);
     ambienceCache.set(cellKey, createRoomAmbience(gx, gy, dungeonSeed));
@@ -44,8 +47,47 @@ function getAmbience(room, cellKey, dungeonSeed) {
 }
 
 export function tickRoomAmbience(cellKey, dt, dungeonSeed) {
-  const ambience = ambienceCache.get(cellKey);
-  if (ambience) updateRoomAmbience(ambience, dt);
+  const ambience = getAmbience(cellKey, dungeonSeed);
+  updateRoomAmbience(ambience, dt);
+}
+
+function drawRock(ctx, px, py) {
+  const inset = ROCK_HITBOX_INSET;
+  const w = TILE_SIZE - inset * 2;
+  const h = TILE_SIZE - inset * 2;
+  const x = px + inset;
+  const y = py + inset;
+  const r = ROCK_HITBOX_RADIUS;
+
+  const traceRockPath = () => {
+    ctx.beginPath();
+    if (typeof ctx.roundRect === "function") {
+      ctx.roundRect(x, y, w, h, r);
+    } else {
+      ctx.moveTo(x + r, y);
+      ctx.lineTo(x + w - r, y);
+      ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+      ctx.lineTo(x + w, y + h - r);
+      ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+      ctx.lineTo(x + r, y + h);
+      ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+      ctx.lineTo(x, y + r);
+      ctx.quadraticCurveTo(x, y, x + r, y);
+      ctx.closePath();
+    }
+  };
+
+  traceRockPath();
+  ctx.fillStyle = TILE_COLORS[TILE.ROCK];
+  ctx.fill();
+
+  ctx.fillStyle = "rgba(255,255,255,0.08)";
+  ctx.fillRect(x + 3, y + 3, w * 0.45, h * 0.35);
+
+  traceRockPath();
+  ctx.strokeStyle = "rgba(0,0,0,0.25)";
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
 }
 
 function textureBand(ctx, x, y, w, h, horizontal) {
@@ -107,7 +149,7 @@ function drawDoor(ctx, originX, originY, segment, wall) {
   }
 }
 
-function drawWalls(ctx, originX, originY, width, height, room) {
+function drawWalls(ctx, originX, originY, width, height, room, isBoss = false) {
   const floorX = originX + WALL_THICKNESS;
   const floorY = originY + WALL_THICKNESS;
   const floorW = ROOM_WIDTH * TILE_SIZE;
@@ -124,6 +166,14 @@ function drawWalls(ctx, originX, originY, width, height, room) {
   ctx.fillStyle = "rgba(0,0,0,0.18)";
   ctx.fillRect(floorX, floorY + floorH - 3, floorW, 3);
   ctx.fillRect(floorX + floorW - 3, floorY, 3, floorH);
+
+  if (isBoss) {
+    ctx.fillStyle = "rgba(90, 15, 15, 0.45)";
+    ctx.fillRect(originX, originY, width, WALL_THICKNESS);
+    ctx.fillRect(originX, originY + height - WALL_THICKNESS, width, WALL_THICKNESS);
+    ctx.fillRect(originX, originY, WALL_THICKNESS, height);
+    ctx.fillRect(originX + width - WALL_THICKNESS, originY, WALL_THICKNESS, height);
+  }
 
   for (const wall of DOOR_WALLS) {
     if (!room.doors[wall]) continue;
@@ -154,7 +204,16 @@ export function drawRoom(ctx, room, offsetX, offsetY, options = {}) {
       const px = floorX + x * TILE_SIZE;
       const py = floorY + y * TILE_SIZE;
 
-      if (code !== TILE.FLOOR) {
+      if (code === TILE.BLOOD) {
+        ctx.fillStyle = TILE_COLORS[TILE.BLOOD];
+        ctx.fillRect(px + 2, py + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+        ctx.fillStyle = "rgba(120, 20, 20, 0.35)";
+        ctx.beginPath();
+        ctx.arc(px + TILE_SIZE * 0.65, py + TILE_SIZE * 0.55, TILE_SIZE * 0.22, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (code === TILE.ROCK) {
+        drawRock(ctx, px, py);
+      } else if (code !== TILE.FLOOR) {
         ctx.fillStyle = TILE_COLORS[code] ?? "#ff00ff";
         ctx.fillRect(px + 4, py + 4, TILE_SIZE - 8, TILE_SIZE - 8);
       }
@@ -165,11 +224,11 @@ export function drawRoom(ctx, room, offsetX, offsetY, options = {}) {
   }
 
   if (options.cellKey && options.dungeonSeed != null) {
-    const ambience = getAmbience(room, options.cellKey, options.dungeonSeed);
+    const ambience = getAmbience(options.cellKey, options.dungeonSeed);
     drawRoomAmbience(ctx, ambience, floorX, floorY, floorW, floorH);
   }
 
-  drawWalls(ctx, originX, originY, width, height, room);
+  drawWalls(ctx, originX, originY, width, height, room, options.isBoss);
 
   return { originX, originY, width, height, floorX, floorY, floorW, floorH };
 }
