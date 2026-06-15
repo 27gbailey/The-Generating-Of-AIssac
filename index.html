@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Generating Of AIssac</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="ui">
+    <div id="hud">
+      <span id="health">HP: 100</span>
+      <span id="score">Score: 0</span>
+      <span id="enemies">Enemies: 0</span>
+    </div>
+    <div id="overlay" class="hidden">
+      <h1 id="overlay-title">The Generating Of AIssac</h1>
+      <p id="overlay-text">Survive the procedurally generated dungeon. Defeat all enemies.</p>
+      <p class="controls">
+        WASD / Arrow keys — move (8 directions)<br>
+        Mouse — aim &nbsp;|&nbsp; Click / Space — shoot
+      </p>
+      <button id="start-btn">Enter the Dungeon</button>
+    </div>
+  </div>
+  <canvas id="game"></canvas>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
