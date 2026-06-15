@@ -4,6 +4,7 @@ import { drawRoom } from "./render.js";
 import { getRoomScreenLayout, getSpawnPosition } from "./roomSpace.js";
 import { createInputState, bindInput } from "./input.js";
 import { AIsaac } from "./player.js";
+import { TearBurst } from "./effects.js";
 
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
@@ -20,6 +21,7 @@ const game = {
   room,
   player: new AIsaac(spawn.x, spawn.y),
   tears: [],
+  bursts: [],
 };
 
 let lastTime = performance.now();
@@ -40,10 +42,16 @@ function update(dt) {
   if (tear) game.tears.push(tear);
 
   for (const t of game.tears) {
-    t.update(dt, game.room);
+    const burstPos = t.update(dt, game.room);
+    if (burstPos) game.bursts.push(new TearBurst(burstPos.x, burstPos.y));
   }
 
   game.tears = game.tears.filter((t) => t.state !== "dead");
+
+  for (const burst of game.bursts) {
+    burst.update(dt);
+  }
+  game.bursts = game.bursts.filter((b) => !b.dead);
 }
 
 function draw() {
@@ -55,6 +63,10 @@ function draw() {
 
   for (const tear of game.tears) {
     tear.draw(ctx, layout);
+  }
+
+  for (const burst of game.bursts) {
+    burst.draw(ctx, layout);
   }
 
   game.player.draw(ctx, layout);

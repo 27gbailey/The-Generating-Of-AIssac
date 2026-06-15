@@ -15,24 +15,17 @@ export class Tear {
     this.distance = 0;
     this.maxRange = TEAR_MAX_RANGE;
     this.state = "flying";
-    this.fallTimer = 0;
   }
 
   update(dt, room) {
-    if (this.state === "dead") return;
-
-    if (this.state === "fallen") {
-      this.fallTimer -= dt;
-      if (this.fallTimer <= 0) this.state = "dead";
-      return;
-    }
+    if (this.state === "dead") return null;
 
     const nextX = this.x + this.vx * dt;
     const nextY = this.y + this.vy * dt;
 
     if (circleHitsRoom(nextX, nextY, this.radius, room)) {
       this.state = "dead";
-      return;
+      return { x: this.x, y: this.y };
     }
 
     this.x = nextX;
@@ -40,11 +33,11 @@ export class Tear {
     this.distance += TEAR_SPEED * dt;
 
     if (this.distance >= this.maxRange) {
-      this.vx = 0;
-      this.vy = 0;
-      this.state = "fallen";
-      this.fallTimer = 0.35;
+      this.state = "dead";
+      return { x: this.x, y: this.y };
     }
+
+    return null;
   }
 
   draw(ctx, layout) {
@@ -52,10 +45,8 @@ export class Tear {
 
     const screenX = layout.floorX + this.x;
     const screenY = layout.floorY + this.y;
-    const alpha = this.state === "fallen" ? Math.max(0, this.fallTimer / 0.35) : 1;
 
     ctx.save();
-    ctx.globalAlpha = alpha;
     ctx.fillStyle = "#8ecff5";
     ctx.shadowColor = "#8ecff5";
     ctx.shadowBlur = 10;
@@ -67,7 +58,7 @@ export class Tear {
 }
 
 export function spawnTear(player, headDir) {
-  const offset = player.radius + TEAR_RADIUS + 4;
+  const offset = player.radius + TEAR_RADIUS + 6;
   return new Tear(
     player.x + headDir.x * offset,
     player.y + headDir.y * offset,

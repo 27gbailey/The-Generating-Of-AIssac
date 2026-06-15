@@ -9,6 +9,15 @@ const KEY_MAP = {
   arrowright: "arrowright",
 };
 
+const ARROW_PRIORITY = ["arrowup", "arrowdown", "arrowleft", "arrowright"];
+
+const CARDINALS = {
+  arrowup: { x: 0, y: -1 },
+  arrowdown: { x: 0, y: 1 },
+  arrowleft: { x: -1, y: 0 },
+  arrowright: { x: 1, y: 0 },
+};
+
 export function createInputState() {
   return {
     keys: new Set(),
@@ -45,15 +54,8 @@ export function getBodyVector(keys) {
 }
 
 export function getHeadVector(keys) {
-  let x = 0;
-  let y = 0;
-  if (keys.has("arrowup")) y -= 1;
-  if (keys.has("arrowdown")) y += 1;
-  if (keys.has("arrowleft")) x -= 1;
-  if (keys.has("arrowright")) x += 1;
-
-  if (x === 0 && y === 0) return null;
-
-  const len = Math.hypot(x, y);
-  return { x: x / len, y: y / len };
+  for (const key of ARROW_PRIORITY) {
+    if (keys.has(key)) return { ...CARDINALS[key] };
+  }
+  return null;
 }
