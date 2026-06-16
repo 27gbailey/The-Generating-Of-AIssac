@@ -24,13 +24,23 @@ function normalizePickups(raw = []) {
   });
 }
 
-function buildLayout({ rocks = [], poops = [], blood = [], barrels = [], campfires = [], pickups = [], skipPerimeter = false } = {}) {
+function buildLayout({
+  rocks = [],
+  poops = [],
+  blood = [],
+  barrels = [],
+  campfires = [],
+  redCampfires = [],
+  pickups = [],
+  skipPerimeter = false,
+} = {}) {
   const grid = createEmptyGrid();
   for (const [x, y] of rocks) place(grid, x, y, TILE.ROCK);
   for (const [x, y] of poops) place(grid, x, y, TILE.POOP);
   for (const [x, y] of blood) place(grid, x, y, TILE.BLOOD);
   for (const [x, y] of barrels) place(grid, x, y, TILE.BARREL);
   for (const [x, y] of campfires) place(grid, x, y, TILE.CAMPFIRE);
+  for (const [x, y] of redCampfires) place(grid, x, y, TILE.RED_CAMPFIRE);
   if (!skipPerimeter) applyPerimeterRing(grid);
   return { grid, pickups: normalizePickups(pickups) };
 }
@@ -372,6 +382,28 @@ const PRESET_LAYOUTS = {
     rocks: [[6, 3]],
   },
 
+  red_corner_lurker: { redCampfires: [[2, 1]] },
+  red_corner_pair: { redCampfires: [[2, 1], [10, 5]] },
+  red_four_corners: { redCampfires: [[2, 1], [10, 1], [2, 5], [10, 5]] },
+  red_center_cluster: { redCampfires: [[5, 3], [6, 3], [7, 3]] },
+  red_center_pyramid: { redCampfires: [[6, 2], [5, 3], [6, 3], [7, 3]] },
+  red_mixed_corners: {
+    redCampfires: [[2, 1], [10, 1], [2, 5], [10, 5]],
+    campfires: [[6, 3]],
+  },
+  red_scatter_mixed: {
+    redCampfires: [[4, 2], [8, 4], [3, 5]],
+    campfires: [[6, 3], [9, 2]],
+  },
+  red_flank_guards: {
+    redCampfires: [[3, 3], [9, 3]],
+    campfires: [[6, 1], [6, 5]],
+  },
+  red_hell_hearth: {
+    redCampfires: [[5, 2], [7, 2], [6, 3], [5, 4], [7, 4]],
+    campfires: [[4, 3], [8, 3]],
+  },
+
   boss_chamber: {
     blood: [
       [1, 0], [2, 0], [10, 0], [11, 0], [0, 1], [12, 1],
@@ -458,7 +490,8 @@ export function pickPresetForCell(rand, requiredWalls, excludeBoss = true) {
   else if (roll < 0.64) group = PRESET_GROUPS.poops;
   else if (roll < 0.76) group = PRESET_GROUPS.barrels;
   else if (roll < 0.84) group = PRESET_GROUPS.campfires;
-  else if (roll < 0.94) group = PRESET_GROUPS.loot;
+  else if (roll < 0.92) group = PRESET_GROUPS.red_campfires;
+  else if (roll < 0.97) group = PRESET_GROUPS.loot;
   else group = PRESET_GROUPS.puzzle;
 
   const pool = group.filter((id) => {
@@ -500,6 +533,11 @@ const PRESET_GROUPS = {
   ],
   campfires: [
     "campfire_center", "campfire_north", "twin_campfires", "edge_campfires",
+  ],
+  red_campfires: [
+    "red_corner_lurker", "red_corner_pair", "red_four_corners", "red_center_cluster",
+    "red_center_pyramid", "red_mixed_corners", "red_scatter_mixed", "red_flank_guards",
+    "red_hell_hearth",
   ],
   loot: [
     "west_cache", "east_vault", "north_loot", "south_stash", "single_center",

@@ -117,6 +117,67 @@ export class PoopSplatter {
   }
 }
 
+export class BloodTearBurst {
+  constructor(x, y) {
+    this.x = x;
+    this.y = y;
+    this.life = 0.4;
+    this.maxLife = 0.4;
+    this.particles = [];
+
+    for (let i = 0; i < 9; i++) {
+      const angle = (Math.PI * 2 * i) / 9 + Math.random() * 0.5;
+      const speed = 60 + Math.random() * 90;
+      this.particles.push({
+        x: 0,
+        y: 0,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        radius: 2.5 + Math.random() * 3.5,
+      });
+    }
+  }
+
+  update(dt) {
+    this.life -= dt;
+    for (const p of this.particles) {
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.vx *= 0.9;
+      p.vy *= 0.9;
+      p.radius *= 0.94;
+    }
+  }
+
+  draw(ctx, layout) {
+    if (this.life <= 0) return;
+
+    const baseX = layout.floorX + this.x;
+    const baseY = layout.floorY + this.y;
+    const alpha = this.life / this.maxLife;
+
+    ctx.save();
+    for (const p of this.particles) {
+      ctx.globalAlpha = alpha * 0.85;
+      ctx.fillStyle = "#aa2020";
+      ctx.beginPath();
+      ctx.arc(baseX + p.x, baseY + p.y, p.radius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = "#cc3030";
+    ctx.beginPath();
+    ctx.arc(baseX, baseY, 5 * alpha + 2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  get dead() {
+    return this.life <= 0;
+  }
+}
+
 export class BombExplosion {
   constructor(x, y, radiusX, radiusY) {
     this.x = x;

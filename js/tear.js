@@ -51,7 +51,7 @@ export class Tear {
       damageCampfire(room, campfireHit.key);
       this.state = "dead";
       const extinguished = !wasExtinguished && state?.extinguished;
-      return { x: this.x, y: this.y, campfire: true, extinguished };
+      return { x: this.x, y: this.y, campfire: true, extinguished, isRed: campfireHit.isRed };
     }
 
     if (circleHitsRoom(nextX, nextY, this.radius, room)) {

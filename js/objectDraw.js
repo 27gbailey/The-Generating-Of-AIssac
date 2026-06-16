@@ -1,4 +1,5 @@
 import { TILE_SIZE } from "./constants.js";
+import { traceRockVisual } from "./objectHitbox.js";
 
 export function drawTileShadow(ctx, px, py, scale = 1) {
   ctx.fillStyle = "rgba(0, 0, 0, 0.32)";
@@ -15,65 +16,39 @@ export function drawTileShadow(ctx, px, py, scale = 1) {
   ctx.fill();
 }
 
-/** Lumpy boulder — cracked granite chunk with flat facets. */
+/** Squarish organic rock blob. */
 export function drawRock3D(ctx, px, py) {
-  const cx = px + TILE_SIZE / 2;
-  const base = py + TILE_SIZE - 6;
-
-  drawTileShadow(ctx, px, py, 1);
+  drawTileShadow(ctx, px, py, 0.95);
 
   ctx.save();
-
-  ctx.fillStyle = "#3e3e42";
-  ctx.beginPath();
-  ctx.moveTo(cx - 22, base - 2);
-  ctx.lineTo(cx - 26, base + 3);
-  ctx.lineTo(cx - 8, base + 4);
-  ctx.lineTo(cx - 6, base - 8);
-  ctx.closePath();
+  traceRockVisual(ctx, px, py);
+  ctx.fillStyle = "#6e6e6e";
   ctx.fill();
 
-  ctx.fillStyle = "#56565c";
-  ctx.beginPath();
-  ctx.moveTo(cx + 20, base - 4);
-  ctx.lineTo(cx + 28, base + 2);
-  ctx.lineTo(cx + 6, base + 5);
-  ctx.lineTo(cx + 8, base - 10);
-  ctx.closePath();
+  const { cx, cy, rx } = traceRockVisual(ctx, px, py);
+  const grad = ctx.createLinearGradient(cx - rx, cy - rx, cx + rx, cy + rx);
+  grad.addColorStop(0, "#909090");
+  grad.addColorStop(0.45, "#747474");
+  grad.addColorStop(1, "#525252");
+  traceRockVisual(ctx, px, py);
+  ctx.fillStyle = grad;
   ctx.fill();
 
-  ctx.fillStyle = "#767680";
+  ctx.fillStyle = "rgba(255,255,255,0.12)";
   ctx.beginPath();
-  ctx.moveTo(cx - 20, py + 16);
-  ctx.lineTo(cx + 18, py + 12);
-  ctx.lineTo(cx + 22, py + 28);
-  ctx.lineTo(cx - 4, py + 32);
-  ctx.lineTo(cx - 24, py + 26);
-  ctx.closePath();
+  ctx.ellipse(cx - rx * 0.22, cy - rx * 0.28, rx * 0.26, rx * 0.16, -0.35, 0, Math.PI * 2);
   ctx.fill();
 
-  ctx.fillStyle = "#9494a0";
-  ctx.beginPath();
-  ctx.moveTo(cx - 10, py + 14);
-  ctx.lineTo(cx + 12, py + 12);
-  ctx.lineTo(cx + 6, py + 22);
-  ctx.lineTo(cx - 8, py + 24);
-  ctx.closePath();
-  ctx.fill();
-
-  ctx.strokeStyle = "rgba(20,20,24,0.55)";
-  ctx.lineWidth = 1.4;
-  ctx.beginPath();
-  ctx.moveTo(cx - 14, py + 20);
-  ctx.lineTo(cx + 4, py + 28);
-  ctx.moveTo(cx + 2, py + 16);
-  ctx.lineTo(cx + 16, py + 24);
+  traceRockVisual(ctx, px, py);
+  ctx.strokeStyle = "rgba(0,0,0,0.28)";
+  ctx.lineWidth = 1.6;
   ctx.stroke();
 
-  ctx.strokeStyle = "rgba(255,255,255,0.12)";
+  ctx.strokeStyle = "rgba(40,40,40,0.35)";
+  ctx.lineWidth = 1.2;
   ctx.beginPath();
-  ctx.moveTo(cx - 8, py + 15);
-  ctx.lineTo(cx + 8, py + 14);
+  ctx.moveTo(cx - rx * 0.35, cy + rx * 0.05);
+  ctx.lineTo(cx + rx * 0.15, cy + rx * 0.25);
   ctx.stroke();
 
   ctx.restore();

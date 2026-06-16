@@ -255,6 +255,9 @@ export function generateDungeon(seed = Date.now()) {
     if (!cell.bombs) {
       cell.bombs = [];
     }
+    if (!cell.bloodTears) {
+      cell.bloodTears = [];
+    }
     initCellPickups(cell, built);
     built.poopStates = cell.poopStates;
     built.destroyedRocks = cell.destroyedRocks;
@@ -268,6 +271,7 @@ export function generateDungeon(seed = Date.now()) {
       barrelStates: cell.barrelStates,
       campfireStates: cell.campfireStates,
       bombs: cell.bombs,
+      bloodTears: cell.bloodTears,
       pickups: cell.pickups,
       collectedPickups: cell.collectedPickups,
       chest: cell.chest ?? null,

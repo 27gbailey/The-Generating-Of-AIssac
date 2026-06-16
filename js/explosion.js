@@ -77,7 +77,7 @@ export function destroyObjectsInExplosion(room, cx, cy, radiusX = EXPLOSION_RADI
         destroyPoopInstant(room, tx, ty);
       } else if (code === TILE.BARREL && isBarrelSolid(room, tx, ty)) {
         destroyBarrelInstant(room, tx, ty);
-      } else if (code === TILE.CAMPFIRE) {
+      } else if (code === TILE.CAMPFIRE || code === TILE.RED_CAMPFIRE) {
         extinguishCampfireInExplosion(room, tx, ty);
       }
     }

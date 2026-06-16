@@ -76,6 +76,7 @@ export const sfx = {
     tone(90, 0.5, "triangle", 0.06, 30);
   },
   floorReset: () => tone(120, 0.2, "sine", 0.05, 220),
+  bloodTearShoot: () => tone(120, 0.12, "sawtooth", 0.05, 80),
   barrelExplode: () => {
     noise(0.15, 0.1);
     tone(55, 0.2, "square", 0.07, 25);

@@ -238,9 +238,12 @@ export function drawRoom(ctx, room, offsetX, offsetY, options = {}) {
       } else if (code === TILE.BARREL) {
         const state = room.barrelStates?.[`${x},${y}`] ?? { hits: 0, destroyed: false };
         drawBarrel(ctx, px, py, state.hits, state.destroyed);
-      } else if (code === TILE.CAMPFIRE) {
+      } else if (code === TILE.CAMPFIRE || code === TILE.RED_CAMPFIRE) {
         const state = room.campfireStates?.[`${x},${y}`] ?? { hits: 0, extinguished: false };
-        drawCampfire(ctx, px, py, state.hits, state.extinguished, time);
+        drawCampfire(ctx, px, py, state.hits, state.extinguished, time, {
+          isRed: code === TILE.RED_CAMPFIRE,
+          flicker: state.flicker ?? 0,
+        });
       } else if (code !== TILE.FLOOR) {
         ctx.fillStyle = TILE_COLORS[code] ?? "#ff00ff";
         ctx.fillRect(px + 4, py + 4, TILE_SIZE - 8, TILE_SIZE - 8);

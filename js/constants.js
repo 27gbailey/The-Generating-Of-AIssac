@@ -16,6 +16,7 @@ export const TILE = {
   POOP: "04",
   BARREL: "05",
   CAMPFIRE: "06",
+  RED_CAMPFIRE: "07",
 };
 
 export const DOOR_WALLS = ["north", "east", "south", "west"];
@@ -54,6 +55,7 @@ export const BARREL_HITS_TO_DESTROY = 3;
 
 export const CAMPFIRE_HITS_TO_EXTINGUISH = 8;
 export const CAMPFIRE_DAMAGE = 1;
+export const BLOOD_TEAR_DAMAGE = 1;
 
 export const PICKUP_PENNY_RADIUS = 12;
 export const PICKUP_KEY_RADIUS = 13;

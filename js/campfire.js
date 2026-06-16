@@ -5,17 +5,34 @@ import {
   TILE,
   TILE_SIZE,
 } from "./constants.js";
+import { spawnBloodTearFromCampfire } from "./bloodTear.js";
 import { drawTileShadow } from "./objectDraw.js";
 import { circleIntersectsObjectHitbox } from "./objectHitbox.js";
+
+export function isCampfireCode(code) {
+  return code === TILE.CAMPFIRE || code === TILE.RED_CAMPFIRE;
+}
+
+export function isRedCampfireCode(code) {
+  return code === TILE.RED_CAMPFIRE;
+}
 
 export function initCampfireStates(grid, existing = null) {
   const states = existing ? { ...existing } : {};
   for (let y = 0; y < ROOM_HEIGHT; y++) {
     for (let x = 0; x < ROOM_WIDTH; x++) {
-      if (grid[y][x] !== TILE.CAMPFIRE) continue;
+      const code = grid[y][x];
+      if (!isCampfireCode(code)) continue;
       const key = `${x},${y}`;
       if (!states[key]) {
-        states[key] = { hits: 0, extinguished: false };
+        const isRed = code === TILE.RED_CAMPFIRE;
+        states[key] = {
+          hits: 0,
+          extinguished: false,
+          isRed,
+          shootTimer: isRed ? 1.2 + ((x * 17 + y * 31) % 100) / 50 : 0,
+          flicker: 0,
+        };
       }
     }
   }
@@ -23,11 +40,15 @@ export function initCampfireStates(grid, existing = null) {
 }
 
 export function isCampfireTile(room, tx, ty) {
-  return room.grid[ty]?.[tx] === TILE.CAMPFIRE;
+  return isCampfireCode(room.grid[ty]?.[tx]);
+}
+
+export function isRedCampfireTile(room, tx, ty) {
+  return room.grid[ty]?.[tx] === TILE.RED_CAMPFIRE;
 }
 
 export function campfireState(room, tx, ty) {
-  return room.campfireStates?.[`${tx},${ty}`] ?? { hits: 0, extinguished: false };
+  return room.campfireStates?.[`${tx},${ty}`] ?? { hits: 0, extinguished: false, isRed: false };
 }
 
 export function isCampfireBurning(room, tx, ty) {
@@ -52,7 +73,7 @@ export function findCampfireHit(cx, cy, radius, room) {
     for (let tx = minTx; tx <= maxTx; tx++) {
       if (!isCampfireBurning(room, tx, ty)) continue;
       if (circleIntersectsObjectHitbox(cx, cy, radius, tx, ty)) {
-        return { tx, ty, key: `${tx},${ty}` };
+        return { tx, ty, key: `${tx},${ty}`, isRed: isRedCampfireTile(room, tx, ty) };
       }
     }
   }
@@ -79,6 +100,7 @@ export function extinguishCampfireInstant(room, tx, ty) {
 }
 
 export function extinguishCampfireInExplosion(room, tx, ty) {
+  if (!isCampfireTile(room, tx, ty)) return false;
   return extinguishCampfireInstant(room, tx, ty);
 }
 
@@ -109,6 +131,32 @@ export function checkCampfireBurn(player, room) {
   return false;
 }
 
+export function updateRedCampfires(room, dt, player, rand) {
+  const spawned = [];
+  if (!room.campfireStates) return spawned;
+
+  for (let ty = 0; ty < ROOM_HEIGHT; ty++) {
+    for (let tx = 0; tx < ROOM_WIDTH; tx++) {
+      if (!isRedCampfireTile(room, tx, ty)) continue;
+      const key = `${tx},${ty}`;
+      const state = room.campfireStates[key];
+      if (!state || state.extinguished) continue;
+
+      if (state.flicker > 0) state.flicker -= dt;
+
+      state.shootTimer -= dt;
+      if (state.shootTimer > 0) continue;
+
+      state.shootTimer = 2.8 + rand() * 2.8;
+      state.flicker = 0.22;
+      const center = campfireFireCenter(tx, ty);
+      spawned.push(spawnBloodTearFromCampfire(center.x, center.y, player, rand));
+    }
+  }
+
+  return spawned;
+}
+
 function drawFirewood(ctx, cx, cy) {
   ctx.strokeStyle = "#3a2510";
   ctx.lineWidth = 5;
@@ -127,7 +175,51 @@ function drawFirewood(ctx, cx, cy) {
   ctx.fillRect(cx - 16, cy + 8, 32, 6);
 }
 
-export function drawCampfire(ctx, px, py, hits, extinguished, time = 0) {
+function drawFlame(ctx, cx, cy, intensity, time, red, flickerFlash = 0) {
+  const flicker = 0.85 + Math.sin(time * 14) * 0.08 + Math.sin(time * 23) * 0.05;
+  const flashBoost = flickerFlash > 0 ? 1.15 + Math.sin(time * 40) * 0.12 : 0;
+  const scale = intensity * flicker * (1 + flashBoost * 0.25);
+  const fh = 22 * scale;
+  const fw = 14 * scale;
+
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+
+  const grad = ctx.createRadialGradient(cx, cy - fh * 0.35, 0, cx, cy - fh * 0.2, fw * 1.4);
+  if (red) {
+    grad.addColorStop(0, `rgba(255, 180, 180, ${0.9 * intensity})`);
+    grad.addColorStop(0.4, `rgba(220, 40, 40, ${0.65 * intensity})`);
+    grad.addColorStop(1, "rgba(120, 10, 10, 0)");
+  } else {
+    grad.addColorStop(0, `rgba(255, 240, 160, ${0.85 * intensity})`);
+    grad.addColorStop(0.4, `rgba(255, 140, 40, ${0.55 * intensity})`);
+    grad.addColorStop(1, "rgba(180, 40, 10, 0)");
+  }
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - fh);
+  ctx.quadraticCurveTo(cx - fw, cy - fh * 0.2, cx - fw * 0.6, cy + 4);
+  ctx.quadraticCurveTo(cx, cy + 8, cx + fw * 0.6, cy + 4);
+  ctx.quadraticCurveTo(cx + fw, cy - fh * 0.2, cx, cy - fh);
+  ctx.fill();
+
+  const coreColor = red ? `rgba(255, 100, 100, ${0.45 * intensity})` : `rgba(255, 200, 80, ${0.35 * intensity})`;
+  ctx.fillStyle = coreColor;
+  ctx.beginPath();
+  ctx.arc(cx, cy - fh * 0.45, fw * 0.35, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+
+  const glowColor = red ? `rgba(200, 30, 30, ${0.14 * intensity})` : `rgba(255, 120, 30, ${0.12 * intensity})`;
+  ctx.fillStyle = glowColor;
+  ctx.beginPath();
+  ctx.ellipse(cx, cy + 10, fw * 1.6, fh * 0.25, 0, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+export function drawCampfire(ctx, px, py, hits, extinguished, time = 0, options = {}) {
+  const { isRed = false, flicker = 0 } = options;
   const cx = px + TILE_SIZE / 2;
   const cy = py + TILE_SIZE / 2 + 6;
 
@@ -143,35 +235,5 @@ export function drawCampfire(ctx, px, py, hits, extinguished, time = 0) {
   }
 
   const intensity = 1 - hits / CAMPFIRE_HITS_TO_EXTINGUISH;
-  const flicker = 0.85 + Math.sin(time * 14) * 0.08 + Math.sin(time * 23) * 0.05;
-  const scale = intensity * flicker;
-  const fh = 22 * scale;
-  const fw = 14 * scale;
-
-  ctx.save();
-  ctx.globalCompositeOperation = "lighter";
-
-  const grad = ctx.createRadialGradient(cx, cy - fh * 0.35, 0, cx, cy - fh * 0.2, fw * 1.4);
-  grad.addColorStop(0, `rgba(255, 240, 160, ${0.85 * intensity})`);
-  grad.addColorStop(0.4, `rgba(255, 140, 40, ${0.55 * intensity})`);
-  grad.addColorStop(1, "rgba(180, 40, 10, 0)");
-  ctx.fillStyle = grad;
-  ctx.beginPath();
-  ctx.moveTo(cx, cy - fh);
-  ctx.quadraticCurveTo(cx - fw, cy - fh * 0.2, cx - fw * 0.6, cy + 4);
-  ctx.quadraticCurveTo(cx, cy + 8, cx + fw * 0.6, cy + 4);
-  ctx.quadraticCurveTo(cx + fw, cy - fh * 0.2, cx, cy - fh);
-  ctx.fill();
-
-  ctx.fillStyle = `rgba(255, 200, 80, ${0.35 * intensity})`;
-  ctx.beginPath();
-  ctx.arc(cx, cy - fh * 0.45, fw * 0.35, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.restore();
-
-  ctx.fillStyle = `rgba(255, 120, 30, ${0.12 * intensity})`;
-  ctx.beginPath();
-  ctx.ellipse(cx, cy + 10, fw * 1.6, fh * 0.25, 0, 0, Math.PI * 2);
-  ctx.fill();
+  drawFlame(ctx, cx, cy, intensity, time, isRed, flicker);
 }

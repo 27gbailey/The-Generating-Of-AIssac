@@ -3,9 +3,9 @@ import { drawRoom, roomPixelSize, tickRoomAmbience } from "./render.js";
 import { getRoomScreenLayout, getSpawnPosition } from "./roomSpace.js";
 import { createInputState, bindInput, clearInputFrame } from "./input.js";
 import { AIsaac } from "./player.js";
-import { TearBurst, PoopSplatter, BombExplosion } from "./effects.js";
+import { TearBurst, PoopSplatter, BombExplosion, BloodTearBurst } from "./effects.js";
 import { tryPlaceBomb } from "./bomb.js";
-import { BOMB_PLACE_COOLDOWN, EXPLOSION_RADIUS_X, EXPLOSION_RADIUS_Y } from "./constants.js";
+import { BOMB_PLACE_COOLDOWN, EXPLOSION_RADIUS_X, EXPLOSION_RADIUS_Y, BLOOD_TEAR_DAMAGE } from "./constants.js";
 import { resolveExplosionChain } from "./explosion.js";
 import {
   generateDungeon,
@@ -16,7 +16,7 @@ import {
 import { drawMinimap } from "./minimap.js";
 import { initStatsHud, updateRoomHud, updateStatsHud } from "./hud.js";
 import { collectPushableEntities } from "./pushablePhysics.js";
-import { checkCampfireBurn } from "./campfire.js";
+import { checkCampfireBurn, updateRedCampfires } from "./campfire.js";
 import { CAMPFIRE_DAMAGE } from "./constants.js";
 import { sfx } from "./audio.js";
 
@@ -24,6 +24,12 @@ function syncRoomEntities(cell) {
   game.chest = cell?.chest ?? null;
   game.pickups = cell?.pickups ?? [];
   game.bombs = cell?.bombs ?? [];
+  game.bloodTears = cell?.bloodTears ?? [];
+}
+
+function persistRoomEntities(cell) {
+  if (!cell) return;
+  cell.bloodTears = game.bloodTears;
 }
 
 function updateChestsAndPickups(dt) {
@@ -103,6 +109,7 @@ function regenerateFloor() {
   game.bombs = start.bombs ?? [];
   game.tears = [];
   game.bursts = [];
+  game.bloodTears = [];
   game.bombCooldown = 0;
   game.roomTransition = null;
   syncRoomEntities(start);
@@ -131,6 +138,7 @@ function boot() {
     player: new AIsaac(spawn.x, spawn.y),
     tears: [],
     bursts: [],
+    bloodTears: [],
     bombCooldown: 0,
     roomTransition: null,
     worldTime: 0,
@@ -211,6 +219,7 @@ function updateBombs(dt) {
 }
 
 function beginRoomTransition(transition) {
+  persistRoomEntities(currentCell());
   const entry = entryPosition(transition.entry);
   game.roomTransition = {
     ...transition,
@@ -228,6 +237,7 @@ function beginRoomTransition(transition) {
   };
   game.tears = [];
   game.bursts = [];
+  game.bloodTears = [];
   game.player.vx = 0;
   game.player.vy = 0;
 }
@@ -305,6 +315,30 @@ function update(dt) {
     }
   }
 
+  const newBloodTears = updateRedCampfires(game.room, dt, game.player, Math.random);
+  if (newBloodTears.length) {
+    game.bloodTears.push(...newBloodTears);
+    sfx.bloodTearShoot();
+  }
+
+  for (const bt of game.bloodTears) {
+    const hit = bt.update(dt, game.room, game.player);
+    if (hit) {
+      game.bursts.push(new BloodTearBurst(hit.x, hit.y));
+      if (hit.hitPlayer) {
+        if (game.player.takeDamage(BLOOD_TEAR_DAMAGE)) {
+          sfx.hurt();
+          updateStatsHud(game.player.stats);
+          checkPlayerDeath();
+        }
+      } else {
+        sfx.tearHit();
+      }
+    }
+  }
+  game.bloodTears = game.bloodTears.filter((bt) => bt.state !== "dead");
+  persistRoomEntities(currentCell());
+
   updateBombs(dt);
   updateChestsAndPickups(dt);
 
@@ -373,6 +407,10 @@ function drawWorldContents(layout, bombs = game.bombs, screenOverride = null) {
 
   for (const tear of game.tears) {
     tear.draw(ctx, layout);
+  }
+
+  for (const bt of game.bloodTears) {
+    bt.draw(ctx, layout);
   }
 
   for (const burst of game.bursts) {
