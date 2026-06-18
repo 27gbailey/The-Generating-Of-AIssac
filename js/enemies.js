@@ -25,6 +25,8 @@ function isSolidForLineOfSight(room, tx, ty) {
   const code = room.grid[ty]?.[tx];
   if (code === TILE.WALL) return true;
   if (code === TILE.ROCK && isRockSolid(room, tx, ty)) return true;
+  if (code === TILE.BLUE_ROCK && isBlueRockSolid(room, tx, ty)) return true;
+  if (code === TILE.POT && isPotSolid(room, tx, ty)) return true;
   if (code === TILE.POOP && isPoopSolid(room, tx, ty)) return true;
   if (code === TILE.BARREL && isBarrelSolid(room, tx, ty)) return true;
   return false;

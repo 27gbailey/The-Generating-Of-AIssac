@@ -54,6 +54,90 @@ export function drawRock3D(ctx, px, py) {
   ctx.restore();
 }
 
+/** Cyan-tinted rock with a subtle etched X — only breakable by bombs. */
+export function drawBlueRock3D(ctx, px, py) {
+  drawTileShadow(ctx, px, py, 0.95);
+
+  ctx.save();
+  traceRockVisual(ctx, px, py);
+  ctx.fillStyle = "#5a7a82";
+  ctx.fill();
+
+  const { cx, cy, rx } = traceRockVisual(ctx, px, py);
+  const grad = ctx.createLinearGradient(cx - rx, cy - rx, cx + rx, cy + rx);
+  grad.addColorStop(0, "#7aa8b0");
+  grad.addColorStop(0.45, "#5d8a92");
+  grad.addColorStop(1, "#3a5860");
+  traceRockVisual(ctx, px, py);
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  ctx.fillStyle = "rgba(180, 240, 255, 0.16)";
+  ctx.beginPath();
+  ctx.ellipse(cx - rx * 0.22, cy - rx * 0.28, rx * 0.26, rx * 0.16, -0.35, 0, Math.PI * 2);
+  ctx.fill();
+
+  traceRockVisual(ctx, px, py);
+  ctx.strokeStyle = "rgba(20, 50, 60, 0.35)";
+  ctx.lineWidth = 1.6;
+  ctx.stroke();
+
+  ctx.strokeStyle = "rgba(120, 210, 230, 0.55)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(cx - rx * 0.42, cy - rx * 0.38);
+  ctx.lineTo(cx + rx * 0.42, cy + rx * 0.38);
+  ctx.moveTo(cx + rx * 0.42, cy - rx * 0.38);
+  ctx.lineTo(cx - rx * 0.42, cy + rx * 0.38);
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+/** Ceramic pot — solid like a rock but shatters for loot. */
+export function drawPot3D(ctx, px, py) {
+  const cx = px + TILE_SIZE / 2;
+  const base = py + TILE_SIZE - 8;
+
+  drawTileShadow(ctx, px, py, 0.82);
+
+  ctx.save();
+
+  ctx.fillStyle = "#7a4a28";
+  ctx.beginPath();
+  ctx.moveTo(cx - 18, base);
+  ctx.quadraticCurveTo(cx - 22, base - 18, cx - 12, base - 28);
+  ctx.lineTo(cx + 12, base - 28);
+  ctx.quadraticCurveTo(cx + 22, base - 18, cx + 18, base);
+  ctx.closePath();
+  ctx.fill();
+
+  const grad = ctx.createLinearGradient(cx - 20, base - 30, cx + 20, base);
+  grad.addColorStop(0, "#a06838");
+  grad.addColorStop(0.55, "#8a5528");
+  grad.addColorStop(1, "#5a3818");
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  ctx.strokeStyle = "#3a2410";
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  ctx.fillStyle = "#6a4424";
+  ctx.fillRect(cx - 14, base - 32, 28, 5);
+  ctx.strokeStyle = "#402810";
+  ctx.strokeRect(cx - 14, base - 32, 28, 5);
+
+  ctx.strokeStyle = "rgba(255,255,255,0.12)";
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(cx - 8, base - 24);
+  ctx.quadraticCurveTo(cx - 4, base - 14, cx - 2, base - 6);
+  ctx.stroke();
+
+  ctx.restore();
+}
+
 /** Barrel with wooden staves and metal bands. */
 export function drawBarrel3D(ctx, px, py, stage = 0, destroyed = false) {
   const cx = px + TILE_SIZE / 2;

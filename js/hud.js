@@ -5,6 +5,7 @@ const HEART_SVG = {
   full: `<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 21s-7.2-4.6-9.4-8.8C.8 9.2 2.6 5.8 6.2 5.2c1.9-.3 3.7.5 4.8 2 1.1-1.5 2.9-2.3 4.8-2 3.6.6 5.4 4 3.6 7-2.2 4.2-9.4 8.8-9.4 8.8z"/></svg>`,
   empty: `<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" d="M12 21s-7.2-4.6-9.4-8.8C.8 9.2 2.6 5.8 6.2 5.2c1.9-.3 3.7.5 4.8 2 1.1-1.5 2.9-2.3 4.8-2 3.6.6 5.4 4 3.6 7-2.2 4.2-9.4 8.8-9.4 8.8z"/></svg>`,
   unowned: `<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.4" d="M12 21s-7.2-4.6-9.4-8.8C.8 9.2 2.6 5.8 6.2 5.2c1.9-.3 3.7.5 4.8 2 1.1-1.5 2.9-2.3 4.8-2 3.6.6 5.4 4 3.6 7-2.2 4.2-9.4 8.8-9.4 8.8z"/></svg>`,
+  soul: `<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 21s-7.2-4.6-9.4-8.8C.8 9.2 2.6 5.8 6.2 5.2c1.9-.3 3.7.5 4.8 2 1.1-1.5 2.9-2.3 4.8-2 3.6.6 5.4 4 3.6 7-2.2 4.2-9.4 8.8-9.4 8.8z"/></svg>`,
 };
 
 let heartsEl = null;
@@ -37,7 +38,19 @@ function renderHeartSlot(slotEl, state, slotIndex) {
     return;
   }
 
-  const svgKey = state === "full" ? "full" : state === "empty" ? "empty" : "unowned";
+  if (state === "soul_half") {
+    slotEl.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><defs><clipPath id="soul-half-${slotIndex}"><rect x="0" y="0" width="12" height="24"/></clipPath></defs><path clip-path="url(#soul-half-${slotIndex})" fill="currentColor" d="M12 21s-7.2-4.6-9.4-8.8C.8 9.2 2.6 5.8 6.2 5.2c1.9-.3 3.7.5 4.8 2 1.1-1.5 2.9-2.3 4.8-2 3.6.6 5.4 4 3.6 7-2.2 4.2-9.4 8.8-9.4 8.8z"/><path fill="none" stroke="currentColor" stroke-width="1.8" d="M12 21s7.2-4.6 9.4-8.8c1.8-2.8 0-6.2-3.6-6.8-1.9-.3-3.7.5-4.8 2-1.1-1.5-2.9-2.3-4.8-2-3.6.6-5.4 4-3.6 7 2.2 4.2 9.4 8.8 9.4 8.8z"/></svg>`;
+    return;
+  }
+
+  const svgKey =
+    state === "full"
+      ? "full"
+      : state === "soul_full"
+        ? "soul"
+        : state === "empty"
+          ? "empty"
+          : "unowned";
   slotEl.innerHTML = HEART_SVG[svgKey];
 }
 

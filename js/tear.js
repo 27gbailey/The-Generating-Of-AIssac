@@ -3,6 +3,7 @@ import { barrelExplosionCenter, damageBarrel, findBarrelHit } from "./barrel.js"
 import { damageCampfire, findCampfireHit } from "./campfire.js";
 import { circleHitsRoom, findPoopHit } from "./roomSpace.js";
 import { damagePoop } from "./poop.js";
+import { destroyPot, findPotHit } from "./pot.js";
 import { findEnemyHit } from "./enemies.js";
 
 export const TEAR_MAX_RANGE = TILE_SIZE * 5;
@@ -50,6 +51,13 @@ export class Tear {
       damagePoop(room, poopHit.key);
       this.state = "dead";
       return { x: this.x, y: this.y, poop: true };
+    }
+
+    const potHit = findPotHit(nextX, nextY, this.radius, room);
+    if (potHit) {
+      destroyPot(room, potHit.tx, potHit.ty);
+      this.state = "dead";
+      return { x: this.x, y: this.y, pot: true, tx: potHit.tx, ty: potHit.ty };
     }
 
     const campfireHit = findCampfireHit(nextX, nextY, this.radius, room);

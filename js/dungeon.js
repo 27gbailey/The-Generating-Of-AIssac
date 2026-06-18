@@ -20,6 +20,8 @@ import { spawnChestsInDungeon } from "./chestSpawner.js";
 import { createPickupsFromLayout } from "./pickup.js";
 import { spawnEnemiesInDungeon } from "./enemySpawner.js";
 import { createBrokenDoors, syncRoomDoorLock } from "./doorLock.js";
+import { initDestroyedPots } from "./pot.js";
+import { applyRoomObjectVariants } from "./roomVariants.js";
 
 function mulberry32(seed) {
   return function rand() {
@@ -241,12 +243,15 @@ export function generateDungeon(seed = Date.now()) {
   const rooms = {};
   for (const cell of Object.values(cells)) {
     const doors = computeDoors(cell, cells, cell.presetId);
-    const built = buildRoomFromPreset(cell.presetId, doors);
+    const built = buildRoomFromPreset(cell.presetId, doors, rand);
     if (!cell.poopStates) {
       cell.poopStates = initPoopStates(built.grid);
     }
     if (!cell.destroyedRocks) {
       cell.destroyedRocks = initDestroyedRocks(built.grid);
+    }
+    if (!cell.destroyedPots) {
+      cell.destroyedPots = initDestroyedPots(built.grid);
     }
     if (!cell.barrelStates) {
       cell.barrelStates = initBarrelStates(built.grid);
@@ -263,6 +268,7 @@ export function generateDungeon(seed = Date.now()) {
     initCellPickups(cell, built);
     built.poopStates = cell.poopStates;
     built.destroyedRocks = cell.destroyedRocks;
+    built.destroyedPots = cell.destroyedPots;
     built.barrelStates = cell.barrelStates;
     built.campfireStates = cell.campfireStates;
     rooms[`${cell.gx},${cell.gy}`] = {
@@ -270,6 +276,7 @@ export function generateDungeon(seed = Date.now()) {
       doors,
       poopStates: cell.poopStates,
       destroyedRocks: cell.destroyedRocks,
+      destroyedPots: cell.destroyedPots,
       barrelStates: cell.barrelStates,
       campfireStates: cell.campfireStates,
       bombs: cell.bombs,

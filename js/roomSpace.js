@@ -9,7 +9,7 @@ import {
 import { isInDoorGap } from "./doors.js";
 import { isDoorBlocked } from "./doorLock.js";
 import { isBarrelSolid, barrelHitbox } from "./barrel.js";
-import { isRockSolid } from "./destructibles.js";
+import { isBlueRockSolid, isPotSolid, isRockSolid } from "./destructibles.js";
 import { findPoopHit, isPoopSolid, poopHitbox } from "./poop.js";
 import { circleIntersectsObjectHitbox, objectHitbox } from "./objectHitbox.js";
 import { BODY_RADIUS, CHEST_OFFSET_Y } from "./constants.js";
@@ -46,6 +46,8 @@ export function playToScreen(x, y, layout) {
 function isSolidTile(code, room, tx, ty) {
   if (code === TILE.WALL) return true;
   if (code === TILE.ROCK) return isRockSolid(room, tx, ty);
+  if (code === TILE.BLUE_ROCK) return isBlueRockSolid(room, tx, ty);
+  if (code === TILE.POT) return isPotSolid(room, tx, ty);
   if (code === TILE.POOP) return isPoopSolid(room, tx, ty);
   if (code === TILE.BARREL) return isBarrelSolid(room, tx, ty);
   return false;
@@ -115,7 +117,7 @@ export function circleHitsRoom(cx, cy, radius, room) {
     for (let tx = minTx; tx <= maxTx; tx++) {
       const code = room.grid[ty][tx];
       if (!isSolidTile(code, room, tx, ty)) continue;
-      if (code === TILE.ROCK) {
+      if (code === TILE.ROCK || code === TILE.BLUE_ROCK || code === TILE.POT) {
         if (circleIntersectsRoundedRect(cx, cy, radius, rockHitbox(tx, ty))) return true;
       } else if (code === TILE.POOP) {
         if (circleIntersectsRoundedRect(cx, cy, radius, poopHitbox(tx, ty))) return true;
@@ -144,7 +146,7 @@ export function circleHitsRoomExcluding(cx, cy, radius, room, exX, exY, exR) {
       if (!isSolidTile(code, room, tx, ty)) continue;
 
       let hit = false;
-      if (code === TILE.ROCK) {
+      if (code === TILE.ROCK || code === TILE.BLUE_ROCK || code === TILE.POT) {
         hit = circleIntersectsRoundedRect(cx, cy, radius, rockHitbox(tx, ty));
       } else if (code === TILE.POOP) {
         hit = circleIntersectsRoundedRect(cx, cy, radius, poopHitbox(tx, ty));

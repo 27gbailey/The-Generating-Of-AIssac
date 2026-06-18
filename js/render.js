@@ -7,11 +7,11 @@ import {
   WALL_THICKNESS,
 } from "./constants.js";
 import { doorSegment } from "./doors.js";
-import { isRockSolid } from "./destructibles.js";
+import { isBlueRockSolid, isPotSolid, isRockSolid } from "./destructibles.js";
 import { drawBarrel } from "./barrel.js";
 import { drawPoop } from "./poop.js";
 import { drawCampfire } from "./campfire.js";
-import { drawRock3D } from "./objectDraw.js";
+import { drawRock3D, drawBlueRock3D, drawPot3D } from "./objectDraw.js";
 import {
   createRoomAmbience,
   drawRoomAmbience,
@@ -263,6 +263,14 @@ export function drawRoom(ctx, room, offsetX, offsetY, options = {}) {
       } else if (code === TILE.ROCK) {
         if (isRockSolid(room, x, y)) {
           drawRock3D(ctx, px, py);
+        }
+      } else if (code === TILE.BLUE_ROCK) {
+        if (isBlueRockSolid(room, x, y)) {
+          drawBlueRock3D(ctx, px, py);
+        }
+      } else if (code === TILE.POT) {
+        if (isPotSolid(room, x, y)) {
+          drawPot3D(ctx, px, py);
         }
       } else if (code === TILE.POOP) {
         const state = room.poopStates?.[`${x},${y}`] ?? { hits: 0, destroyed: false };

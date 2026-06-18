@@ -17,6 +17,8 @@ export const TILE = {
   BARREL: "05",
   CAMPFIRE: "06",
   RED_CAMPFIRE: "07",
+  POT: "08",
+  BLUE_ROCK: "09",
 };
 
 export const DOOR_WALLS = ["north", "east", "south", "west"];
@@ -95,4 +97,14 @@ export const DOOR_CLEARANCE = {
   east: [{ x: 12, y: 2 }, { x: 12, y: 3 }],
 };
 
-export const BLOCKING_TILES = new Set([TILE.ROCK, TILE.WALL, TILE.POOP, TILE.BARREL]);
+export const BLOCKING_TILES = new Set([
+  TILE.ROCK, TILE.BLUE_ROCK, TILE.WALL, TILE.POOP, TILE.BARREL, TILE.POT,
+]);
+
+/** Chance for a rock tile to become a blue rock when rooms are built. */
+export const BLUE_ROCK_REPLACE_CHANCE = 0.28;
+/** Chance for a rock tile to become a pot instead (after blue rock roll). */
+export const POT_REPLACE_CHANCE = 0.14;
+
+/** Explosion reach multiplier when testing locked-door breaks. */
+export const DOOR_BREAK_RADIUS_SCALE = 1.35;

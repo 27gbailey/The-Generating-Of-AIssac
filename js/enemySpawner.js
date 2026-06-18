@@ -36,6 +36,8 @@ function countLayoutObstacles(room) {
       const code = room.grid[ty][tx];
       if (
         code === TILE.ROCK ||
+        code === TILE.BLUE_ROCK ||
+        code === TILE.POT ||
         code === TILE.POOP ||
         code === TILE.BARREL ||
         code === TILE.CAMPFIRE ||

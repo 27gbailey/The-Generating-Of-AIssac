@@ -6,11 +6,10 @@ import {
   TILE_SIZE,
 } from "./constants.js";
 import { Pickup } from "./pickup.js";
+import { rollClearRoomLoot } from "./lootDrops.js";
 import { circleHitsRoom } from "./roomSpace.js";
 
 export const CLEAR_ROOM_DROP_CHANCE = 0.18;
-
-const CLEAR_LOOT_TYPES = ["penny", "penny", "penny", "penny", "half_heart", "bomb", "key"];
 
 const CENTER_TX = Math.floor(ROOM_WIDTH / 2);
 const CENTER_TY = Math.floor(ROOM_HEIGHT / 2);
@@ -53,7 +52,7 @@ export function tryRoomClearReward(cell, room, rand = Math.random) {
     return null;
   }
 
-  const type = CLEAR_LOOT_TYPES[Math.floor(rand() * CLEAR_LOOT_TYPES.length)];
+  const type = rollClearRoomLoot(rand);
   const key = `${type},clear,${cell.gx},${cell.gy},${spot.tx},${spot.ty}`;
   if (cell.collectedPickups?.has(key)) {
     cell.clearRewardDropped = true;

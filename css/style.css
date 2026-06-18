@@ -73,6 +73,14 @@ body {
   color: rgba(120, 90, 90, 0.28);
 }
 
+.heart-soul_full {
+  color: #4a9fd8;
+}
+
+.heart-soul_half {
+  color: #4a9fd8;
+}
+
 .heart-inactive {
   opacity: 0;
 }

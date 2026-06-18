@@ -9,7 +9,9 @@ import {
 } from "./constants.js";
 import {
   applyHeartPickup,
+  applySoulHeartPickup,
   canCollectHeart,
+  canCollectSoulHeart,
 } from "./stats.js";
 import {
   applyPlayerPushToCircle,
@@ -23,6 +25,7 @@ const TYPE_RADIUS = {
   bomb: PICKUP_BOMB_RADIUS,
   half_heart: PICKUP_HALF_HEART_RADIUS,
   full_heart: PICKUP_FULL_HEART_RADIUS,
+  soul_heart: PICKUP_FULL_HEART_RADIUS,
 };
 
 export function pickupKey(type, tx, ty) {
@@ -35,6 +38,7 @@ export function tileToPickupPos(tx, ty) {
 
 export function applyPickupToStats(type, stats) {
   if (!stats) return false;
+  if (type === "soul_heart") return applySoulHeartPickup(stats);
   if (type === "half_heart" || type === "full_heart") {
     return applyHeartPickup(stats, type);
   }
@@ -78,7 +82,7 @@ export class Pickup {
   }
 
   isHeart() {
-    return this.type === "half_heart" || this.type === "full_heart";
+    return this.type === "half_heart" || this.type === "full_heart" || this.type === "soul_heart";
   }
 
   collectionRadius(player) {
@@ -103,8 +107,14 @@ export class Pickup {
     if (dist >= this.collectionRadius(player)) return null;
 
     if (this.isHeart()) {
-      if (!canCollectHeart(player.stats, this.type)) return null;
-      applyHeartPickup(player.stats, this.type);
+      if (this.type === "soul_heart") {
+        if (!canCollectSoulHeart(player.stats)) return null;
+        applySoulHeartPickup(player.stats);
+      } else if (!canCollectHeart(player.stats, this.type)) {
+        return null;
+      } else {
+        applyHeartPickup(player.stats, this.type);
+      }
     } else {
       applyPickupToStats(this.type, player.stats);
     }
@@ -196,6 +206,16 @@ export class Pickup {
       ctx.font = "bold 8px system-ui,sans-serif";
       ctx.textAlign = "center";
       ctx.fillText("+2", sx, sy + r * 0.95);
+    } else if (this.type === "soul_heart") {
+      drawHeartShape(ctx, sx, sy, r * 1.05, "#4a9fd8", false);
+      ctx.fillStyle = "rgba(200, 240, 255, 0.45)";
+      ctx.beginPath();
+      ctx.arc(sx - r * 0.25, sy - r * 0.2, r * 0.18, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#dff6ff";
+      ctx.font = "bold 8px system-ui,sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("SOUL", sx, sy + r * 0.95);
     }
 
     ctx.restore();
@@ -226,6 +246,7 @@ export function rollChestLoot(rand) {
   if (rand() < 0.32) loot.push({ type: "bomb" });
   if (rand() < 0.28) loot.push({ type: "half_heart" });
   if (rand() < 0.07) loot.push({ type: "full_heart" });
+  if (rand() < 0.05) loot.push({ type: "soul_heart" });
   if (loot.length === 0) loot.push({ type: rand() < 0.4 ? "half_heart" : "penny" });
   return loot;
 }

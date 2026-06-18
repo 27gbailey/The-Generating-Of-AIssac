@@ -7,6 +7,7 @@ import {
   TILE,
 } from "./constants.js";
 import { createEmptyGrid, decodeRoomId, encodeRoomId } from "./roomId.js";
+import { applyRoomObjectVariants } from "./roomVariants.js";
 
 function place(grid, x, y, code) {
   if (x >= 0 && x < ROOM_WIDTH && y >= 0 && y < ROOM_HEIGHT) {
@@ -333,6 +334,47 @@ const PRESET_LAYOUTS = {
     poops: [[6, 3]],
   },
 
+  // Large cut-off chambers
+  west_sealed_wing: {
+    rocks: [[4, 0], [4, 1], [4, 2], [4, 3], [4, 4], [4, 5], [4, 6]],
+    poops: [[4, 3]],
+    barrels: [[9, 3]],
+  },
+  east_sealed_wing: {
+    rocks: [[8, 0], [8, 1], [8, 2], [8, 3], [8, 4], [8, 5], [8, 6]],
+    poops: [[8, 3]],
+    campfires: [[2, 3]],
+  },
+  north_blocked_half: {
+    rocks: [[0, 3], [1, 3], [2, 3], [3, 3], [4, 3], [5, 3], [6, 3], [7, 3], [8, 3], [9, 3], [10, 3], [11, 3], [12, 3]],
+    poops: [[6, 2]],
+    barrels: [[6, 5]],
+  },
+  south_blocked_half: {
+    rocks: [[0, 4], [1, 4], [2, 4], [3, 4], [4, 4], [5, 4], [6, 4], [7, 4], [8, 4], [9, 4], [10, 4], [11, 4], [12, 4]],
+    campfires: [[3, 2], [9, 2]],
+    poops: [[6, 5]],
+  },
+  vertical_split: {
+    rocks: [[6, 0], [6, 1], [6, 2], [6, 4], [6, 5], [6, 6]],
+    poops: [[6, 3]],
+    barrels: [[2, 3], [10, 3]],
+  },
+  horizontal_split: {
+    rocks: [[0, 3], [1, 3], [2, 3], [3, 3], [5, 3], [6, 3], [7, 3], [9, 3], [10, 3], [11, 3], [12, 3]],
+    poops: [[4, 3], [8, 3]],
+  },
+  corner_vault: {
+    rocks: [[0, 0], [1, 0], [2, 0], [3, 0], [4, 0], [0, 1], [0, 2], [0, 3], [0, 4], [0, 5], [1, 5], [2, 5], [3, 5], [4, 5], [4, 4], [4, 3], [4, 2], [4, 1]],
+    poops: [[2, 2]],
+    pickups: [["key", 1, 1]],
+  },
+  east_maze_chunk: {
+    rocks: [[7, 1], [7, 2], [7, 3], [7, 4], [7, 5], [8, 1], [9, 1], [10, 1], [10, 2], [10, 3], [10, 4], [10, 5], [9, 5], [8, 5]],
+    poops: [[9, 3]],
+    barrels: [[8, 3]],
+  },
+
   rock_poop_split: {
     rocks: [[3, 2], [3, 4], [9, 2], [9, 4]],
     poops: [[6, 1], [6, 5]],
@@ -555,15 +597,16 @@ export function wallsConflictWithNeighbors(blocked, neighborWalls) {
 export function pickPresetForCell(rand, requiredWalls, excludeBoss = true) {
   const roll = rand();
   let group;
-  if (roll < 0.22) group = PRESET_GROUPS.minimal;
-  else if (roll < 0.34) group = PRESET_GROUPS.sparse;
-  else if (roll < 0.52) group = PRESET_GROUPS.rocks;
-  else if (roll < 0.64) group = PRESET_GROUPS.poops;
-  else if (roll < 0.68) group = PRESET_GROUPS.barrels;
-  else if (roll < 0.76) group = PRESET_GROUPS.campfires;
-  else if (roll < 0.84) group = PRESET_GROUPS.red_campfires;
-  else if (roll < 0.90) group = PRESET_GROUPS.dense;
-  else if (roll < 0.94) group = PRESET_GROUPS.loot;
+  if (roll < 0.18) group = PRESET_GROUPS.minimal;
+  else if (roll < 0.28) group = PRESET_GROUPS.sparse;
+  else if (roll < 0.42) group = PRESET_GROUPS.rocks;
+  else if (roll < 0.52) group = PRESET_GROUPS.poops;
+  else if (roll < 0.55) group = PRESET_GROUPS.barrels;
+  else if (roll < 0.62) group = PRESET_GROUPS.campfires;
+  else if (roll < 0.68) group = PRESET_GROUPS.red_campfires;
+  else if (roll < 0.76) group = PRESET_GROUPS.dense;
+  else if (roll < 0.82) group = PRESET_GROUPS.chambers;
+  else if (roll < 0.90) group = PRESET_GROUPS.loot;
   else group = PRESET_GROUPS.puzzle;
 
   const pool = group.filter((id) => {
@@ -616,6 +659,11 @@ const PRESET_GROUPS = {
     "dense_rock_row", "dense_rock_grid", "dense_poop_cross", "dense_campfire_ring",
     "center_island", "cross_plus", "u_shape",
   ],
+  chambers: [
+    "west_sealed_wing", "east_sealed_wing", "north_blocked_half", "south_blocked_half",
+    "vertical_split", "horizontal_split", "corner_vault", "east_maze_chunk",
+    "split_chamber", "barrier_blast",
+  ],
   loot: [
     "west_cache", "east_vault", "north_loot", "south_stash",
     "loot_behind_rocks", "heart_rock_sanctuary", "bomb_rock_cache", "twin_vault_pickups",
@@ -635,6 +683,7 @@ const PRESET_GROUPS = {
 export const PUZZLE_PRESET_IDS = new Set([
   ...PRESET_GROUPS.puzzle,
   ...PRESET_GROUPS.loot,
+  ...PRESET_GROUPS.chambers,
 ]);
 
 export function isPuzzlePreset(presetId) {
@@ -646,13 +695,14 @@ export function presetHasLayoutPickups(presetId) {
   return (preset?.presetPickups?.length ?? 0) > 0;
 }
 
-export function buildRoomFromPreset(presetId, doors) {
+export function buildRoomFromPreset(presetId, doors, rand = null) {
   const preset = ROOM_PRESETS[presetId];
   if (!preset) {
     throw new Error(`Unknown room preset "${presetId}".`);
   }
 
   const { grid, pickups } = preset.buildGrid();
+  if (rand) applyRoomObjectVariants({ grid }, rand);
   const roomId = encodeRoomId(grid, doors);
   const room = decodeRoomId(roomId);
   return {
@@ -663,6 +713,7 @@ export function buildRoomFromPreset(presetId, doors) {
     presetPickups: pickups,
     poopStates: null,
     destroyedRocks: null,
+    destroyedPots: null,
     barrelStates: null,
     campfireStates: null,
   };

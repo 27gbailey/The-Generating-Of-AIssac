@@ -31,6 +31,7 @@ import {
   syncRoomDoorLock,
   tryBreakDoorsFromExplosion,
 } from "./doorLock.js";
+import { rollPotLoot, spawnLootAtTile } from "./lootDrops.js";
 import { tryRoomClearReward } from "./pickupSpawner.js";
 
 function syncRoomEntities(cell) {
@@ -105,7 +106,8 @@ function currentCell() {
 }
 
 function checkPlayerDeath() {
-  if (game.player.stats.health <= 0 && !game.player.isDying) {
+  const total = game.player.stats.health + game.player.stats.soulHealth;
+  if (total <= 0 && !game.player.isDying) {
     game.player.startDeath();
     sfx.death();
     game.tears = [];
@@ -208,23 +210,22 @@ function tryPlaceBombFromInput() {
 
 function triggerExplosion(x, y) {
   const cell = currentCell();
-  const healthBefore = game.player.stats.health;
+  const healthBefore = game.player.stats.health + game.player.stats.soulHealth;
 
-  if (
-    tryBreakDoorsFromExplosion(
-      cell,
-      game.room,
-      x,
-      y,
-      EXPLOSION_RADIUS_X,
-      EXPLOSION_RADIUS_Y,
-      (wall) => !isBossDoor(game.dungeon, game.gx, game.gy, wall)
-    )
-  ) {
-    sfx.doorBreak();
-  }
-
-  resolveExplosionChain(game.room, x, y, game.bombs, game.player, (bx, by) => {
+  const loot = resolveExplosionChain(game.room, x, y, game.bombs, game.player, (bx, by) => {
+    if (
+      tryBreakDoorsFromExplosion(
+        cell,
+        game.room,
+        bx,
+        by,
+        EXPLOSION_RADIUS_X,
+        EXPLOSION_RADIUS_Y,
+        (wall) => !isBossDoor(game.dungeon, game.gx, game.gy, wall)
+      )
+    ) {
+      sfx.doorBreak();
+    }
     game.bursts.push(new BombExplosion(bx, by, EXPLOSION_RADIUS_X, EXPLOSION_RADIUS_Y));
     sfx.explosion();
     damageEnemiesInExplosion(
@@ -237,9 +238,11 @@ function triggerExplosion(x, y) {
     );
   });
 
+  if (loot.length) game.pickups.push(...loot);
   if (cell) handleRoomClear(cell);
 
-  if (game.player.stats.health < healthBefore) {
+  const healthAfter = game.player.stats.health + game.player.stats.soulHealth;
+  if (healthAfter < healthBefore) {
     sfx.hurt();
     checkPlayerDeath();
   }
@@ -420,6 +423,13 @@ function update(dt) {
       } else if (burstPos.poop) {
         game.bursts.push(new PoopSplatter(burstPos.x, burstPos.y));
         sfx.tearPoop();
+      } else if (burstPos.pot) {
+        game.bursts.push(new TearBurst(burstPos.x, burstPos.y));
+        sfx.tearHit();
+        const potLoot = rollPotLoot();
+        if (potLoot.length) {
+          game.pickups.push(...spawnLootAtTile(potLoot, burstPos.tx, burstPos.ty));
+        }
       } else if (burstPos.campfire) {
         game.bursts.push(new TearBurst(burstPos.x, burstPos.y));
         if (burstPos.extinguished) sfx.extinguish();

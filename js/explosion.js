@@ -10,8 +10,16 @@ import {
 } from "./constants.js";
 import { destroyBarrelInstant, isBarrelSolid } from "./barrel.js";
 import { extinguishCampfireInExplosion } from "./campfire.js";
-import { destroyPoopInstant, destroyRock, isRockSolid } from "./destructibles.js";
+import {
+  destroyPoopInstant,
+  destroyRock,
+  isBlueRockSolid,
+  isPotSolid,
+  isRockSolid,
+  destroyPot,
+} from "./destructibles.js";
 import { isPoopSolid } from "./poop.js";
+import { rollBlueRockLoot, rollPotLoot, spawnLootAtTile } from "./lootDrops.js";
 
 export function pointInExplosion(px, py, cx, cy, radiusX = EXPLOSION_RADIUS_X, radiusY = EXPLOSION_RADIUS_Y) {
   const dx = (px - cx) / radiusX;
@@ -63,8 +71,9 @@ export function explosionTileBounds(cx, cy, radiusX = EXPLOSION_RADIUS_X, radius
   };
 }
 
-export function destroyObjectsInExplosion(room, cx, cy, radiusX = EXPLOSION_RADIUS_X, radiusY = EXPLOSION_RADIUS_Y) {
+export function destroyObjectsInExplosion(room, cx, cy, radiusX = EXPLOSION_RADIUS_X, radiusY = EXPLOSION_RADIUS_Y, rand = Math.random) {
   const { minTx, maxTx, minTy, maxTy } = explosionTileBounds(cx, cy, radiusX, radiusY);
+  const spawnedPickups = [];
 
   for (let ty = minTy; ty <= maxTy; ty++) {
     for (let tx = minTx; tx <= maxTx; tx++) {
@@ -73,6 +82,13 @@ export function destroyObjectsInExplosion(room, cx, cy, radiusX = EXPLOSION_RADI
       const code = room.grid[ty][tx];
       if (code === TILE.ROCK && isRockSolid(room, tx, ty)) {
         destroyRock(room, tx, ty);
+      } else if (code === TILE.BLUE_ROCK && isBlueRockSolid(room, tx, ty)) {
+        destroyRock(room, tx, ty);
+        spawnedPickups.push(...spawnLootAtTile(rollBlueRockLoot(rand), tx, ty, 12, rand));
+      } else if (code === TILE.POT && isPotSolid(room, tx, ty)) {
+        destroyPot(room, tx, ty);
+        const loot = rollPotLoot(rand);
+        if (loot.length) spawnedPickups.push(...spawnLootAtTile(loot, tx, ty, 10, rand));
       } else if (code === TILE.POOP && isPoopSolid(room, tx, ty)) {
         destroyPoopInstant(room, tx, ty);
       } else if (code === TILE.BARREL && isBarrelSolid(room, tx, ty)) {
@@ -82,6 +98,8 @@ export function destroyObjectsInExplosion(room, cx, cy, radiusX = EXPLOSION_RADI
       }
     }
   }
+
+  return spawnedPickups;
 }
 
 export function findBarrelsInExplosion(room, cx, cy, radiusX = EXPLOSION_RADIUS_X, radiusY = EXPLOSION_RADIUS_Y) {
@@ -145,9 +163,10 @@ export function applyExplosionDamage(player, cx, cy, radiusX = EXPLOSION_RADIUS_
   return player.takeDamage(EXPLOSION_DAMAGE);
 }
 
-export function resolveExplosionChain(room, originX, originY, bombs, player, onBurst) {
+export function resolveExplosionChain(room, originX, originY, bombs, player, onBurst, rand = Math.random) {
   const queue = [{ x: originX, y: originY }];
   const seen = new Set();
+  const allPickups = [];
 
   while (queue.length > 0) {
     const { x, y } = queue.shift();
@@ -156,7 +175,8 @@ export function resolveExplosionChain(room, originX, originY, bombs, player, onB
     seen.add(key);
 
     const chains = collectChainDetonations(room, x, y, bombs);
-    destroyObjectsInExplosion(room, x, y);
+    const drops = destroyObjectsInExplosion(room, x, y, EXPLOSION_RADIUS_X, EXPLOSION_RADIUS_Y, rand);
+    allPickups.push(...drops);
     applyExplosionKnockback(player, x, y);
     applyExplosionDamage(player, x, y);
     onBurst(x, y);
@@ -165,4 +185,6 @@ export function resolveExplosionChain(room, originX, originY, bombs, player, onB
       queue.push(next);
     }
   }
+
+  return allPickups;
 }
