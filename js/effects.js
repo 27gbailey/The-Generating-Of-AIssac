@@ -250,3 +250,75 @@ export class BombExplosion {
     return this.life <= 0;
   }
 }
+
+export class BossDeathBurst {
+  constructor(x, y) {
+    this.x = x;
+    this.y = y;
+    this.life = 1.1;
+    this.maxLife = 1.1;
+    this.particles = [];
+
+    for (let i = 0; i < 48; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 120 + Math.random() * 280;
+      this.particles.push({
+        x: 0,
+        y: 0,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        radius: 3 + Math.random() * 8,
+        kind: Math.random() < 0.55 ? "blood" : "chunk",
+      });
+    }
+  }
+
+  update(dt) {
+    this.life -= dt;
+    for (const p of this.particles) {
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.vy += 180 * dt;
+      p.vx *= 0.96;
+      p.vy *= 0.96;
+      p.radius *= 0.985;
+    }
+  }
+
+  draw(ctx, layout) {
+    if (this.life <= 0) return;
+
+    const baseX = layout.floorX + this.x;
+    const baseY = layout.floorY + this.y;
+    const alpha = Math.min(1, this.life / this.maxLife);
+
+    ctx.save();
+    const flash = ctx.createRadialGradient(baseX, baseY, 0, baseX, baseY, 120 * (1 - alpha) + 40);
+    flash.addColorStop(0, `rgba(255, 120, 80, ${alpha * 0.5})`);
+    flash.addColorStop(0.4, `rgba(180, 30, 20, ${alpha * 0.25})`);
+    flash.addColorStop(1, "rgba(60, 10, 5, 0)");
+    ctx.fillStyle = flash;
+    ctx.beginPath();
+    ctx.arc(baseX, baseY, 130, 0, Math.PI * 2);
+    ctx.fill();
+
+    for (const p of this.particles) {
+      ctx.globalAlpha = alpha * 0.9;
+      ctx.fillStyle = p.kind === "blood" ? "#aa1818" : "#6a2020";
+      ctx.beginPath();
+      ctx.arc(baseX + p.x, baseY + p.y, p.radius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = "#cc2020";
+    ctx.beginPath();
+    ctx.arc(baseX, baseY, 18 * alpha + 6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  get dead() {
+    return this.life <= 0;
+  }
+}

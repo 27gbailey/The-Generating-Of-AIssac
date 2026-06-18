@@ -10,12 +10,12 @@ import {
 } from "./constants.js";
 import { BloodTear } from "./bloodTear.js";
 import { circleHitsRoom } from "./roomSpace.js";
-import { isRockSolid } from "./destructibles.js";
+import { isBlueRockSolid, isPotSolid, isRockSolid } from "./destructibles.js";
 import { isPoopSolid } from "./poop.js";
 import { isBarrelSolid } from "./barrel.js";
 
 const HORF_SHOOT_COOLDOWN = 1.8;
-const HORF_SHOOT_RANGE = TILE_SIZE * 6.5;
+const HORF_SHOOT_RANGE = TILE_SIZE * 9;
 const GAPER_SPEED = 95;
 const DIP_BURST_SPEED = 180;
 const DIP_BURST_TIME = 0.22;
@@ -133,7 +133,7 @@ export class Horf extends Enemy {
       if (dist <= HORF_SHOOT_RANGE && hasLineOfSight(room, this.x, this.y, chest.x, chest.y)) {
         const dx = chest.x - this.x;
         const dy = chest.y - this.y;
-        const maxRange = TILE_SIZE * (3.5 + Math.random() * 2);
+        const maxRange = TILE_SIZE * (5.5 + Math.random() * 3);
         bloodTears.push(new BloodTear(this.x, this.y - 4, dx, dy, maxRange));
         this.shootTimer = HORF_SHOOT_COOLDOWN + Math.random() * 0.8;
       } else {

@@ -22,6 +22,8 @@ import { spawnEnemiesInDungeon } from "./enemySpawner.js";
 import { createBrokenDoors, syncRoomDoorLock } from "./doorLock.js";
 import { initDestroyedPots } from "./pot.js";
 import { applyRoomObjectVariants } from "./roomVariants.js";
+import { createBoss } from "./boss.js";
+import { TILE_SIZE } from "./constants.js";
 
 function mulberry32(seed) {
   return function rand() {
@@ -304,6 +306,14 @@ export function generateDungeon(seed = Date.now()) {
   spawnEnemiesInDungeon(dungeon, rand);
 
   for (const cell of Object.values(dungeon.rooms)) {
+    if (cell.isBoss) {
+      cell.enemies = [];
+      if (!cell.boss) {
+        cell.boss = createBoss(TILE_SIZE * 6.5, TILE_SIZE * 3.2);
+      }
+      cell.bossIntroSeen = cell.bossIntroSeen ?? false;
+      cell.bossDefeated = cell.bossDefeated ?? false;
+    }
     syncRoomDoorLock(cell.room, cell);
   }
 

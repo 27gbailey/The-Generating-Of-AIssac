@@ -102,7 +102,7 @@ export const BLOCKING_TILES = new Set([
 ]);
 
 /** Chance for a rock tile to become a blue rock when rooms are built. */
-export const BLUE_ROCK_REPLACE_CHANCE = 0.28;
+export const BLUE_ROCK_REPLACE_CHANCE = 0.06;
 /** Chance for a rock tile to become a pot instead (after blue rock roll). */
 export const POT_REPLACE_CHANCE = 0.14;
 

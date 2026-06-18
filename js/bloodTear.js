@@ -84,6 +84,6 @@ export function spawnBloodTearFromCampfire(cx, cy, player, rand) {
   }
   dx += (rand() - 0.5) * 0.55;
   dy += (rand() - 0.5) * 0.55;
-  const maxRange = TILE_SIZE * (3.2 + rand() * 2.4);
+  const maxRange = TILE_SIZE * (5 + rand() * 3.5);
   return new BloodTear(cx, cy - 8, dx, dy, maxRange);
 }

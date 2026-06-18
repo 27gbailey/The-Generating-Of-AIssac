@@ -89,4 +89,19 @@ export const sfx = {
     noise(0.15, 0.1);
     tone(55, 0.2, "square", 0.07, 25);
   },
+  bossSting: () => {
+    tone(55, 0.55, "sawtooth", 0.1, 28);
+    tone(82, 0.45, "triangle", 0.07, 40);
+    setTimeout(() => tone(110, 0.35, "sawtooth", 0.08, 55), 120);
+    noise(0.18, 0.06);
+  },
+  bossDeath: () => {
+    noise(0.35, 0.14);
+    tone(70, 0.45, "sawtooth", 0.1, 25);
+    tone(45, 0.6, "triangle", 0.08, 18);
+  },
+  floorDescent: () => {
+    tone(180, 0.25, "sine", 0.06, 90);
+    tone(120, 0.4, "triangle", 0.05, 40);
+  },
 };

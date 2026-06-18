@@ -123,8 +123,9 @@ export function refreshDoorLockState(cell, room) {
   const wasLocked = cell.doorsLocked;
   const hadEnemies = (cell.enemies?.length ?? 0) > 0;
   const aliveEnemies = cell.enemies?.some((e) => e.alive) ?? false;
+  const aliveBoss = cell.boss?.alive ?? false;
 
-  cell.doorsLocked = aliveEnemies;
+  cell.doorsLocked = aliveEnemies || aliveBoss;
   syncRoomDoorLock(room, cell);
 
   const justCleared =
@@ -134,7 +135,9 @@ export function refreshDoorLockState(cell, room) {
 }
 
 export function lockDoorsForEnemies(cell, room) {
-  if (!cell?.enemies?.some((e) => e.alive)) return;
+  const hasEnemies = cell?.enemies?.some((e) => e.alive);
+  const hasBoss = cell?.boss?.alive;
+  if (!hasEnemies && !hasBoss) return;
   cell.doorsLocked = true;
   if (!cell.brokenDoors) cell.brokenDoors = createBrokenDoors();
   syncRoomDoorLock(room, cell);

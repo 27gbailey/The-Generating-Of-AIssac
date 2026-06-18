@@ -3,7 +3,7 @@ import { drawRoom, roomPixelSize, tickRoomAmbience } from "./render.js";
 import { getRoomScreenLayout, getSpawnPosition } from "./roomSpace.js";
 import { createInputState, bindInput, clearInputFrame } from "./input.js";
 import { AIsaac } from "./player.js";
-import { TearBurst, PoopSplatter, BombExplosion, BloodTearBurst } from "./effects.js";
+import { TearBurst, PoopSplatter, BombExplosion, BloodTearBurst, BossDeathBurst } from "./effects.js";
 import { tryPlaceBomb } from "./bomb.js";
 import { BOMB_PLACE_COOLDOWN, EXPLOSION_RADIUS_X, EXPLOSION_RADIUS_Y, BLOOD_TEAR_DAMAGE } from "./constants.js";
 import { resolveExplosionChain } from "./explosion.js";
@@ -31,8 +31,21 @@ import {
   syncRoomDoorLock,
   tryBreakDoorsFromExplosion,
 } from "./doorLock.js";
-import { rollPotLoot, spawnLootAtTile } from "./lootDrops.js";
 import { tryRoomClearReward } from "./pickupSpawner.js";
+import {
+  checkBossContact,
+  damageBossInExplosion,
+  BOSS_CONTACT_DAMAGE,
+} from "./boss.js";
+import { spawnTrapdoor } from "./trapdoor.js";
+import { initBossHud, showBossHud, hideBossHud, updateBossHud } from "./bossHud.js";
+import {
+  createBossIntroCinematic,
+  createFloorDescentCinematic,
+  updateCinematic,
+  drawBossIntro,
+  drawFloorDescent,
+} from "./cinematic.js";
 
 function syncRoomEntities(cell) {
   game.chest = cell?.chest ?? null;
@@ -40,6 +53,8 @@ function syncRoomEntities(cell) {
   game.bombs = cell?.bombs ?? [];
   game.bloodTears = cell?.bloodTears ?? [];
   game.enemies = cell?.enemies ?? [];
+  game.boss = cell?.boss ?? null;
+  game.trapdoor = cell?.trapdoor ?? null;
   syncRoomDoorLock(game.room, cell);
 }
 
@@ -47,6 +62,8 @@ function persistRoomEntities(cell) {
   if (!cell) return;
   cell.bloodTears = game.bloodTears;
   cell.enemies = game.enemies;
+  cell.boss = game.boss;
+  cell.trapdoor = game.trapdoor;
 }
 
 function updateChestsAndPickups(dt) {
@@ -121,6 +138,7 @@ function regenerateFloor() {
   const spawn = getSpawnPosition(start.room);
 
   game.dungeon = dungeon;
+  game.floorNumber = 1;
   game.gx = dungeon.start.gx;
   game.gy = dungeon.start.gy;
   game.room = start.room;
@@ -130,10 +148,44 @@ function regenerateFloor() {
   game.bloodTears = [];
   game.bombCooldown = 0;
   game.roomTransition = null;
+  game.cinematic = null;
+  game.boss = null;
+  game.trapdoor = null;
   syncRoomEntities(start);
   syncRoomDoorLock(start.room, start);
   game.player.resetAt(spawn.x, spawn.y);
+  hideBossHud();
   sfx.floorReset();
+  updateHud();
+}
+
+function completeFloorDescent() {
+  const stats = game.player.stats;
+  const floorNumber = (game.floorNumber ?? 1) + 1;
+  const dungeon = generateDungeon(Date.now() + floorNumber * 99991);
+  const start = getCurrentRoomData(dungeon, dungeon.start.gx, dungeon.start.gy);
+  const spawn = getSpawnPosition(start.room);
+
+  game.dungeon = dungeon;
+  game.floorNumber = floorNumber;
+  game.gx = dungeon.start.gx;
+  game.gy = dungeon.start.gy;
+  game.room = start.room;
+  game.bombs = start.bombs ?? [];
+  game.tears = [];
+  game.bursts = [];
+  game.bloodTears = [];
+  game.enemies = start.enemies ?? [];
+  game.bombCooldown = 0;
+  game.roomTransition = null;
+  game.cinematic = null;
+  game.boss = null;
+  game.trapdoor = null;
+  syncRoomEntities(start);
+  syncRoomDoorLock(start.room, start);
+  game.player.resetAt(spawn.x, spawn.y);
+  game.player.stats = stats;
+  hideBossHud();
   updateHud();
 }
 
@@ -148,6 +200,7 @@ function boot() {
 
   game = {
     dungeon,
+    floorNumber: 1,
     gx: dungeon.start.gx,
     gy: dungeon.start.gy,
     room: start.room,
@@ -159,6 +212,9 @@ function boot() {
     bursts: [],
     bloodTears: [],
     enemies: start.enemies ?? [],
+    boss: start.boss ?? null,
+    trapdoor: start.trapdoor ?? null,
+    cinematic: null,
     bombCooldown: 0,
     roomTransition: null,
     worldTime: 0,
@@ -236,6 +292,18 @@ function triggerExplosion(x, y) {
       EXPLOSION_RADIUS_Y,
       EXPLOSION_DAMAGE
     );
+    if (game.boss?.alive) {
+      damageBossInExplosion(
+        game.boss,
+        bx,
+        by,
+        EXPLOSION_RADIUS_X,
+        EXPLOSION_RADIUS_Y,
+        EXPLOSION_DAMAGE
+      );
+      if (!game.boss.alive) onBossDeath(cell, game.boss);
+      else updateBossHud(game.boss);
+    }
   });
 
   if (loot.length) game.pickups.push(...loot);
@@ -301,10 +369,19 @@ function finishRoomTransition() {
   game.player.x = transition.entryX;
   game.player.y = transition.entryY;
   game.dungeon.visited.add(`${game.gx},${game.gy}`);
-  lockDoorsForEnemies(cell, game.room);
-  if (cell?.doorsLocked) sfx.doorLock();
   game.roomTransition = null;
   updateHud();
+
+  if (cell?.isBoss && cell.boss?.alive && !cell.bossIntroSeen) {
+    cell.bossIntroSeen = true;
+    game.cinematic = createBossIntroCinematic();
+    lockDoorsForEnemies(cell, game.room);
+    return;
+  }
+
+  lockDoorsForEnemies(cell, game.room);
+  if (cell?.doorsLocked) sfx.doorLock();
+  if (cell?.isBoss && cell.boss?.alive) showBossHud(cell.boss);
 }
 
 function update(dt) {
@@ -328,6 +405,31 @@ function update(dt) {
     );
     if (game.roomTransition.progress >= 1) {
       game.roomTransition.pendingFinish = true;
+    }
+    clearInputFrame(input);
+    return;
+  }
+
+  if (game.cinematic) {
+    game.worldTime += dt;
+    if (
+      game.cinematic.type === "boss_intro" &&
+      !game.cinematic.stingPlayed &&
+      game.cinematic.progress > 0.22
+    ) {
+      game.cinematic.stingPlayed = true;
+      sfx.bossSting();
+    }
+    const done = updateCinematic(game.cinematic, dt);
+    for (const burst of game.bursts) burst.update(dt);
+    game.bursts = game.bursts.filter((b) => !b.dead);
+    if (done) {
+      if (game.cinematic.type === "boss_intro") {
+        showBossHud(game.boss);
+      } else if (game.cinematic.type === "floor_descent") {
+        completeFloorDescent();
+      }
+      game.cinematic = null;
     }
     clearInputFrame(input);
     return;
@@ -367,6 +469,8 @@ function update(dt) {
   }
 
   updateEnemies(dt);
+  updateBoss(dt);
+  updateTrapdoor(dt);
 
   const newBloodTears = updateRedCampfires(game.room, dt, game.player, Math.random);
   if (newBloodTears.length) {
@@ -410,26 +514,24 @@ function update(dt) {
   }
 
   for (const t of game.tears) {
-    const burstPos = t.update(dt, game.room, game.enemies);
+    const burstPos = t.update(dt, game.room, game.enemies, game.boss);
     if (burstPos) {
       if (burstPos.enemy) {
         game.bursts.push(new TearBurst(burstPos.x, burstPos.y));
         if (burstPos.killed) sfx.enemyDeath();
         else sfx.enemyHit();
         handleRoomClear(currentCell());
+      } else if (burstPos.boss) {
+        game.bursts.push(new TearBurst(burstPos.x, burstPos.y));
+        if (!burstPos.killed) sfx.enemyHit();
+        if (game.boss && !game.boss.alive) onBossDeath(currentCell(), game.boss);
+        else updateBossHud(game.boss);
       } else if (burstPos.barrelExplosion) {
         triggerExplosion(burstPos.barrelExplosion.x, burstPos.barrelExplosion.y);
         game.bursts.push(new TearBurst(burstPos.x, burstPos.y));
       } else if (burstPos.poop) {
         game.bursts.push(new PoopSplatter(burstPos.x, burstPos.y));
         sfx.tearPoop();
-      } else if (burstPos.pot) {
-        game.bursts.push(new TearBurst(burstPos.x, burstPos.y));
-        sfx.tearHit();
-        const potLoot = rollPotLoot();
-        if (potLoot.length) {
-          game.pickups.push(...spawnLootAtTile(potLoot, burstPos.tx, burstPos.ty));
-        }
       } else if (burstPos.campfire) {
         game.bursts.push(new TearBurst(burstPos.x, burstPos.y));
         if (burstPos.extinguished) sfx.extinguish();
@@ -468,6 +570,60 @@ function handleRoomClear(cell) {
   if (reward) {
     game.pickups.push(reward);
     sfx.roomClearDrop();
+  }
+}
+
+function onBossDeath(cell, boss) {
+  if (!cell || cell.bossDefeated) return;
+  cell.bossDefeated = true;
+  game.bursts.push(new BombExplosion(boss.x, boss.y, EXPLOSION_RADIUS_X * 1.35, EXPLOSION_RADIUS_Y * 1.35));
+  game.bursts.push(new BossDeathBurst(boss.x, boss.y));
+  sfx.bossDeath();
+  refreshDoorLockState(cell, game.room);
+  hideBossHud();
+  game.trapdoor = spawnTrapdoor(game.room);
+  cell.trapdoor = game.trapdoor;
+  persistRoomEntities(cell);
+}
+
+function startFloorDescent() {
+  if (game.cinematic) return;
+  if (game.trapdoor) game.trapdoor.active = false;
+  game.cinematic = createFloorDescentCinematic();
+  game.tears = [];
+  game.bombs = [];
+  sfx.floorDescent();
+}
+
+function updateBoss(dt) {
+  const cell = currentCell();
+  const boss = game.boss;
+  if (!boss?.alive) return;
+
+  const result = boss.update(dt, game.room, game.player);
+  if (result.bloodTears?.length) {
+    game.bloodTears.push(...result.bloodTears);
+    sfx.bloodTearShoot();
+  }
+
+  if (checkBossContact(game.player, boss)) {
+    if (game.player.takeDamage(BOSS_CONTACT_DAMAGE)) {
+      sfx.hurt();
+      updateStatsHud(game.player.stats);
+      checkPlayerDeath();
+    }
+  }
+
+  updateBossHud(boss);
+
+  if (!boss.alive) onBossDeath(cell, boss);
+}
+
+function updateTrapdoor(dt) {
+  const trapdoor = game.trapdoor;
+  if (!trapdoor?.active) return;
+  if (trapdoor.update(dt, game.player)) {
+    startFloorDescent();
   }
 }
 
@@ -522,6 +678,10 @@ function drawWorldContents(layout, bombs = game.bombs, screenOverride = null) {
     enemy.draw(ctx, layout);
   }
 
+  if (game.boss) game.boss.draw(ctx, layout);
+
+  if (game.trapdoor) game.trapdoor.draw(ctx, layout);
+
   game.player.draw(ctx, layout, screenOverride);
 }
 
@@ -568,12 +728,22 @@ function draw() {
 
   if (game.roomTransition) {
     drawTransition();
+  } else if (game.cinematic?.type === "floor_descent") {
+    const cx = canvas.width / 2;
+    const cy = canvas.height / 2;
+    drawRoom(ctx, game.room, cx, cy, roomDrawOptions(game.gx, game.gy));
+    const layout = getRoomScreenLayout(cx, cy);
+    drawFloorDescent(ctx, canvas, game.cinematic, layout, game.player);
   } else {
     const cx = canvas.width / 2;
     const cy = canvas.height / 2;
     drawRoom(ctx, game.room, cx, cy, roomDrawOptions(game.gx, game.gy));
     const layout = getRoomScreenLayout(cx, cy);
     drawWorldContents(layout);
+  }
+
+  if (game.cinematic?.type === "boss_intro") {
+    drawBossIntro(ctx, canvas, game.cinematic, game.player);
   }
 
   const mapGx = game.roomTransition ? game.roomTransition.gx : game.gx;
@@ -599,6 +769,7 @@ window.addEventListener("resize", resize);
 try {
   resize();
   initStatsHud();
+  initBossHud();
   boot();
   requestAnimationFrame(loop);
 } catch (error) {

@@ -4,9 +4,9 @@ import { Pickup } from "./pickup.js";
 
 export function rollPotLoot(rand = Math.random) {
   const roll = rand();
-  if (roll < 0.55) return [{ type: "penny" }];
-  if (roll < 0.72) return [{ type: "bomb" }];
-  if (roll < 0.82) return [{ type: "key" }];
+  if (roll < 0.12) return [{ type: "penny" }];
+  if (roll < 0.16) return [{ type: "bomb" }];
+  if (roll < 0.19) return [{ type: "key" }];
   return [];
 }
 
