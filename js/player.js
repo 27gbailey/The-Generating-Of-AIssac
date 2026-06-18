@@ -3,7 +3,7 @@ import { getBodyVector, getHeadVector } from "./input.js";
 import { spawnTear } from "./tear.js";
 import { createPlayerStats } from "./stats.js";
 import { damage } from "./stats.js";
-import { INVINCIBILITY_DURATION, BODY_RADIUS } from "./constants.js";
+import { INVINCIBILITY_DURATION, BODY_RADIUS, CHEST_OFFSET_Y } from "./constants.js";
 
 const DEFAULT_BODY = { x: 0, y: 1 };
 const DEFAULT_HEAD = { x: 0, y: -1 };
@@ -39,6 +39,10 @@ export class AIsaac {
 
   get isDead() {
     return this.deathState?.phase === "done";
+  }
+
+  chestPosition() {
+    return { x: this.x, y: this.y + CHEST_OFFSET_Y };
   }
 
   headPosition() {
@@ -99,18 +103,19 @@ export class AIsaac {
     const steps = 3;
     const stepDt = dt / steps;
     const r = this.bodyRadius;
+    const chestY = CHEST_OFFSET_Y;
 
     for (let i = 0; i < steps; i++) {
       const nextX = this.x + this.vx * stepDt;
       const nextY = this.y + this.vy * stepDt;
 
-      if (!circleHitsRoom(nextX, this.y, r, room)) {
+      if (!circleHitsRoom(nextX, this.y + chestY, r, room)) {
         this.x = nextX;
       } else {
         this.vx = 0;
       }
 
-      if (!circleHitsRoom(this.x, nextY, r, room)) {
+      if (!circleHitsRoom(this.x, nextY + chestY, r, room)) {
         this.y = nextY;
       } else {
         this.vy = 0;

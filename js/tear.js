@@ -1,8 +1,9 @@
-import { TILE_SIZE } from "./constants.js";
+import { TILE_SIZE, TEAR_DAMAGE } from "./constants.js";
 import { barrelExplosionCenter, damageBarrel, findBarrelHit } from "./barrel.js";
 import { damageCampfire, findCampfireHit } from "./campfire.js";
 import { circleHitsRoom, findPoopHit } from "./roomSpace.js";
 import { damagePoop } from "./poop.js";
+import { findEnemyHit } from "./enemies.js";
 
 export const TEAR_MAX_RANGE = TILE_SIZE * 5;
 export const TEAR_SPEED = 340;
@@ -20,11 +21,18 @@ export class Tear {
     this.state = "flying";
   }
 
-  update(dt, room) {
+  update(dt, room, enemies = []) {
     if (this.state === "dead") return null;
 
     const nextX = this.x + this.vx * dt;
     const nextY = this.y + this.vy * dt;
+
+    const enemyHit = findEnemyHit(nextX, nextY, this.radius, enemies);
+    if (enemyHit) {
+      enemyHit.takeDamage(TEAR_DAMAGE);
+      this.state = "dead";
+      return { x: this.x, y: this.y, enemy: true, killed: !enemyHit.alive };
+    }
 
     const barrelHit = findBarrelHit(nextX, nextY, this.radius, room);
     if (barrelHit) {

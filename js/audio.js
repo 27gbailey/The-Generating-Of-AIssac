@@ -77,6 +77,14 @@ export const sfx = {
   },
   floorReset: () => tone(120, 0.2, "sine", 0.05, 220),
   bloodTearShoot: () => tone(120, 0.12, "sawtooth", 0.05, 80),
+  enemyHit: () => tone(200, 0.08, "square", 0.06, 120),
+  enemyDeath: () => tone(90, 0.18, "sawtooth", 0.07, 40),
+  doorBreak: () => {
+    noise(0.12, 0.08);
+    tone(80, 0.2, "square", 0.06, 40);
+  },
+  doorLock: () => tone(140, 0.2, "sawtooth", 0.05, 70),
+  roomClearDrop: () => tone(520, 0.1, "sine", 0.05, 880),
   barrelExplode: () => {
     noise(0.15, 0.1);
     tone(55, 0.2, "square", 0.07, 25);

@@ -1,5 +1,4 @@
 import {
-  CAMPFIRE_FIRE_RADIUS,
   CAMPFIRE_HITS_TO_EXTINGUISH,
   ROOM_HEIGHT,
   ROOM_WIDTH,
@@ -8,7 +7,6 @@ import {
 } from "./constants.js";
 import { spawnBloodTearFromCampfire } from "./bloodTear.js";
 import { drawTileShadow } from "./objectDraw.js";
-import { circleIntersectsObjectHitbox } from "./objectHitbox.js";
 
 export function isCampfireCode(code) {
   return code === TILE.CAMPFIRE || code === TILE.RED_CAMPFIRE;
@@ -73,7 +71,7 @@ export function findCampfireHit(cx, cy, radius, room) {
   for (let ty = minTy; ty <= maxTy; ty++) {
     for (let tx = minTx; tx <= maxTx; tx++) {
       if (!isCampfireBurning(room, tx, ty)) continue;
-      if (circleIntersectsObjectHitbox(cx, cy, radius, tx, ty)) {
+      if (circleIntersectsCampfireTile(cx, cy, radius, tx, ty)) {
         return { tx, ty, key: `${tx},${ty}`, isRed: isRedCampfireTile(room, tx, ty) };
       }
     }
@@ -112,18 +110,30 @@ export function campfireFireCenter(tx, ty) {
   };
 }
 
+function circleIntersectsCampfireTile(cx, cy, radius, tx, ty) {
+  const left = tx * TILE_SIZE + 2;
+  const top = ty * TILE_SIZE + 2;
+  const right = left + TILE_SIZE - 4;
+  const bottom = top + TILE_SIZE - 4;
+  const nearestX = Math.max(left, Math.min(cx, right));
+  const nearestY = Math.max(top, Math.min(cy, bottom));
+  const dx = cx - nearestX;
+  const dy = cy - nearestY;
+  return dx * dx + dy * dy < radius * radius;
+}
+
 export function checkCampfireBurn(player, room) {
+  const chest = player.chestPosition?.() ?? { x: player.x, y: player.y };
   const r = player.bodyRadius ?? player.radius;
-  const minTx = Math.max(0, Math.floor((player.x - r) / TILE_SIZE));
-  const maxTx = Math.min(ROOM_WIDTH - 1, Math.floor((player.x + r) / TILE_SIZE));
-  const minTy = Math.max(0, Math.floor((player.y - r) / TILE_SIZE));
-  const maxTy = Math.min(ROOM_HEIGHT - 1, Math.floor((player.y + r) / TILE_SIZE));
+  const minTx = Math.max(0, Math.floor((chest.x - r - TILE_SIZE) / TILE_SIZE));
+  const maxTx = Math.min(ROOM_WIDTH - 1, Math.floor((chest.x + r + TILE_SIZE) / TILE_SIZE));
+  const minTy = Math.max(0, Math.floor((chest.y - r - TILE_SIZE) / TILE_SIZE));
+  const maxTy = Math.min(ROOM_HEIGHT - 1, Math.floor((chest.y + r + TILE_SIZE) / TILE_SIZE));
 
   for (let ty = minTy; ty <= maxTy; ty++) {
     for (let tx = minTx; tx <= maxTx; tx++) {
       if (!isCampfireBurning(room, tx, ty)) continue;
-      const center = campfireFireCenter(tx, ty);
-      if (Math.hypot(player.x - center.x, player.y - center.y) < CAMPFIRE_FIRE_RADIUS + r * 0.5) {
+      if (circleIntersectsCampfireTile(chest.x, chest.y, r, tx, ty)) {
         return true;
       }
     }

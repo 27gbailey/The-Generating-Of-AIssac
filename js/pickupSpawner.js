@@ -1,4 +1,5 @@
 import {
+  BODY_RADIUS,
   ROOM_HEIGHT,
   ROOM_WIDTH,
   TILE,
@@ -6,47 +7,63 @@ import {
 } from "./constants.js";
 import { Pickup } from "./pickup.js";
 import { circleHitsRoom } from "./roomSpace.js";
-import { BODY_RADIUS } from "./constants.js";
 
-const LOOT_TYPES = ["penny", "penny", "half_heart", "bomb", "key"];
+export const CLEAR_ROOM_DROP_CHANCE = 0.18;
 
-function findFloorPickupSpot(room, rand, avoidCenter = true) {
+const CLEAR_LOOT_TYPES = ["penny", "penny", "penny", "penny", "half_heart", "bomb", "key"];
+
+const CENTER_TX = Math.floor(ROOM_WIDTH / 2);
+const CENTER_TY = Math.floor(ROOM_HEIGHT / 2);
+
+function isOpenFloorTile(room, tx, ty) {
+  const code = room.grid[ty]?.[tx];
+  return code === TILE.FLOOR || code === TILE.BLOOD;
+}
+
+/** Closest walkable tile to room center (center first, then by distance). */
+export function findCenterPickupSpot(room) {
   const candidates = [];
-  for (let ty = 1; ty < ROOM_HEIGHT - 1; ty++) {
-    for (let tx = 1; tx < ROOM_WIDTH - 1; tx++) {
-      const code = room.grid[ty][tx];
-      if (code !== TILE.FLOOR && code !== TILE.BLOOD) continue;
-      if (avoidCenter && tx >= 4 && tx <= 8 && ty >= 2 && ty <= 4) continue;
+
+  for (let ty = 0; ty < ROOM_HEIGHT; ty++) {
+    for (let tx = 0; tx < ROOM_WIDTH; tx++) {
+      if (!isOpenFloorTile(room, tx, ty)) continue;
       const x = tx * TILE_SIZE + TILE_SIZE / 2;
       const y = ty * TILE_SIZE + TILE_SIZE / 2;
       if (circleHitsRoom(x, y, BODY_RADIUS + 4, room)) continue;
-      const edgeScore = Math.min(tx, ty, ROOM_WIDTH - 1 - tx, ROOM_HEIGHT - 1 - ty);
-      candidates.push({ x, y, tx, ty, score: edgeScore + rand() * 2 });
+      const dist = Math.hypot(tx - CENTER_TX, ty - CENTER_TY);
+      candidates.push({ tx, ty, x, y, dist });
     }
   }
+
   if (!candidates.length) return null;
-  candidates.sort((a, b) => b.score - a.score);
-  const pick = candidates[Math.floor(rand() * Math.min(5, candidates.length))];
-  return pick;
+  candidates.sort((a, b) => a.dist - b.dist);
+  return candidates[0];
 }
 
-export function spawnFloorPickupsInDungeon(dungeon, rand) {
-  const cells = Object.values(dungeon.rooms).filter((c) => !c.isStart && !c.isBoss);
-
-  for (const cell of cells) {
-    if (rand() > 0.42) continue;
-    if (cell.pickups.length > 0) continue;
-
-    const count = rand() < 0.35 ? 2 : 1;
-    for (let i = 0; i < count; i++) {
-      const spot = findFloorPickupSpot(cell.room, rand);
-      if (!spot) continue;
-      const type = LOOT_TYPES[Math.floor(rand() * LOOT_TYPES.length)];
-      const key = `${type},floor,${cell.gx},${cell.gy},${spot.tx},${spot.ty}`;
-      if (cell.collectedPickups?.has(key)) continue;
-      cell.pickups.push(
-        new Pickup(type, spot.x, spot.y, 0, 0, { tx: spot.tx, ty: spot.ty, floorKey: key })
-      );
-    }
+export function tryRoomClearReward(cell, room, rand = Math.random) {
+  if (!cell || cell.clearRewardDropped || !cell.hadCombatEnemies) return null;
+  if (rand() > CLEAR_ROOM_DROP_CHANCE) {
+    cell.clearRewardDropped = true;
+    return null;
   }
+
+  const spot = findCenterPickupSpot(room);
+  if (!spot) {
+    cell.clearRewardDropped = true;
+    return null;
+  }
+
+  const type = CLEAR_LOOT_TYPES[Math.floor(rand() * CLEAR_LOOT_TYPES.length)];
+  const key = `${type},clear,${cell.gx},${cell.gy},${spot.tx},${spot.ty}`;
+  if (cell.collectedPickups?.has(key)) {
+    cell.clearRewardDropped = true;
+    return null;
+  }
+
+  cell.clearRewardDropped = true;
+  return new Pickup(type, spot.x, spot.y, 0, 0, {
+    tx: spot.tx,
+    ty: spot.ty,
+    floorKey: key,
+  });
 }

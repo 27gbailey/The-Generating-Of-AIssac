@@ -126,9 +126,26 @@ function drawWallInnerShadow(ctx, x, y, w, h, horizontal, wallSide) {
   }
 }
 
-function drawDoor(ctx, originX, originY, segment, wall) {
+function drawDoor(ctx, originX, originY, segment, wall, locked = false, broken = false) {
   const x = originX + segment.x;
   const y = originY + segment.y;
+
+  if (broken) {
+    ctx.fillStyle = "#1a1410";
+    ctx.fillRect(x, y, segment.w, segment.h);
+    ctx.strokeStyle = "#3a2818";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x + 1, y + 1, segment.w - 2, segment.h - 2);
+    ctx.strokeStyle = "rgba(255,255,255,0.04)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x + 4, y + 4);
+    ctx.lineTo(x + segment.w - 4, y + segment.h - 4);
+    ctx.moveTo(x + segment.w - 4, y + 4);
+    ctx.lineTo(x + 4, y + segment.h - 4);
+    ctx.stroke();
+    return;
+  }
 
   ctx.fillStyle = DOOR_INNER;
   ctx.fillRect(x, y, segment.w, segment.h);
@@ -152,6 +169,19 @@ function drawDoor(ctx, originX, originY, segment, wall) {
     ctx.lineTo(x + segment.w - 2, y + segment.h * 0.35);
     ctx.moveTo(x + 2, y + segment.h * 0.65);
     ctx.lineTo(x + segment.w - 2, y + segment.h * 0.65);
+    ctx.stroke();
+  }
+
+  if (locked) {
+    ctx.fillStyle = "rgba(60, 15, 15, 0.65)";
+    ctx.fillRect(x + 2, y + 2, segment.w - 4, segment.h - 4);
+    ctx.strokeStyle = "#8a2020";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(x + 6, y + 6);
+    ctx.lineTo(x + segment.w - 6, y + segment.h - 6);
+    ctx.moveTo(x + segment.w - 6, y + 6);
+    ctx.lineTo(x + 6, y + segment.h - 6);
     ctx.stroke();
   }
 }
@@ -190,7 +220,9 @@ function drawWalls(ctx, originX, originY, width, height, room, isBoss = false) {
     if (!room.doors[wall]) continue;
     const segment = doorSegment(wall);
     if (!segment) continue;
-    drawDoor(ctx, originX, originY, segment, wall);
+    const locked = room.doorLock?.locked && !room.doorLock?.broken?.[wall];
+    const broken = room.doorLock?.broken?.[wall];
+    drawDoor(ctx, originX, originY, segment, wall, locked, broken);
   }
 }
 

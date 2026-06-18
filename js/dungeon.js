@@ -11,13 +11,15 @@ import {
 } from "./rooms.js";
 import { getPlayAreaSize } from "./roomSpace.js";
 import { isInDoorGap } from "./doors.js";
+import { isDoorPassable } from "./doorLock.js";
 import { initPoopStates } from "./poop.js";
 import { initDestroyedRocks } from "./destructibles.js";
 import { initBarrelStates } from "./barrel.js";
 import { initCampfireStates } from "./campfire.js";
 import { spawnChestsInDungeon } from "./chestSpawner.js";
-import { spawnFloorPickupsInDungeon } from "./pickupSpawner.js";
 import { createPickupsFromLayout } from "./pickup.js";
+import { spawnEnemiesInDungeon } from "./enemySpawner.js";
+import { createBrokenDoors, syncRoomDoorLock } from "./doorLock.js";
 
 function mulberry32(seed) {
   return function rand() {
@@ -276,6 +278,11 @@ export function generateDungeon(seed = Date.now()) {
       collectedPickups: cell.collectedPickups,
       chest: cell.chest ?? null,
       room: built,
+      enemies: cell.enemies ?? [],
+      doorsLocked: cell.doorsLocked ?? false,
+      brokenDoors: cell.brokenDoors ?? createBrokenDoors(),
+      hadCombatEnemies: cell.hadCombatEnemies ?? false,
+      clearRewardDropped: cell.clearRewardDropped ?? false,
     };
   }
 
@@ -288,7 +295,12 @@ export function generateDungeon(seed = Date.now()) {
   };
 
   spawnChestsInDungeon(dungeon, rand);
-  spawnFloorPickupsInDungeon(dungeon, rand);
+  spawnEnemiesInDungeon(dungeon, rand);
+
+  for (const cell of Object.values(dungeon.rooms)) {
+    syncRoomDoorLock(cell.room, cell);
+  }
+
   return dungeon;
 }
 
@@ -296,21 +308,30 @@ export function getCurrentRoomData(dungeon, gx, gy) {
   return dungeon.rooms[`${gx},${gy}`] ?? null;
 }
 
+export function isBossDoor(dungeon, gx, gy, wall) {
+  const { dx, dy } = DIRECTIONS[wall];
+  const neighbor = getCurrentRoomData(dungeon, gx + dx, gy + dy);
+  return Boolean(neighbor?.isBoss);
+}
+
 export function checkDoorTransition(player, room, gx, gy, dungeon) {
   const { width, height } = getPlayAreaSize();
+  const chest = player.chestPosition?.() ?? { x: player.x, y: player.y };
   const r = player.bodyRadius ?? player.radius;
   const rDoor = r * 0.85;
+  const cy = chest.y;
 
   const checks = [
-    { wall: "north", test: player.y - rDoor <= 0, nx: gx, ny: gy - 1, entry: "south" },
-    { wall: "south", test: player.y + rDoor >= height, nx: gx, ny: gy + 1, entry: "north" },
-    { wall: "west", test: player.x - rDoor <= 0, nx: gx - 1, ny: gy, entry: "east" },
-    { wall: "east", test: player.x + rDoor >= width, nx: gx + 1, ny: gy, entry: "west" },
+    { wall: "north", test: cy - rDoor <= 0, nx: gx, ny: gy - 1, entry: "south" },
+    { wall: "south", test: cy + rDoor >= height, nx: gx, ny: gy + 1, entry: "north" },
+    { wall: "west", test: chest.x - rDoor <= 0, nx: gx - 1, ny: gy, entry: "east" },
+    { wall: "east", test: chest.x + rDoor >= width, nx: gx + 1, ny: gy, entry: "west" },
   ];
 
   for (const check of checks) {
     if (!room.doors[check.wall] || !check.test) continue;
-    if (!isInDoorGap(check.wall, player.x, player.y, width, height)) continue;
+    if (!isDoorPassable(room, check.wall)) continue;
+    if (!isInDoorGap(check.wall, chest.x, cy, width, height)) continue;
 
     const next = getCurrentRoomData(dungeon, check.nx, check.ny);
     if (!next) continue;

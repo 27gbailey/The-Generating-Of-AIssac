@@ -277,6 +277,62 @@ const PRESET_LAYOUTS = {
     rocks: [[4, 2], [8, 4], [4, 4], [8, 2], [3, 3], [9, 3]],
     barrels: [[6, 1], [6, 2], [6, 3], [6, 4], [6, 5]],
   },
+  barrel_fuse_v: {
+    rocks: [[4, 2], [8, 4], [4, 4], [8, 2], [3, 3], [9, 3]],
+    barrels: [[6, 1], [6, 2], [6, 3], [6, 4], [6, 5]],
+  },
+
+  // Rock-wall puzzles — break poop / campfire / barrel to pass
+  rock_wall_poop_gate: {
+    rocks: [[3, 2], [4, 2], [5, 2], [7, 2], [8, 2], [9, 2], [3, 3], [4, 3], [5, 3], [7, 3], [8, 3], [9, 3]],
+    poops: [[6, 2]],
+  },
+  rock_wall_campfire_gate: {
+    rocks: [[2, 3], [3, 3], [4, 3], [6, 3], [7, 3], [8, 3], [9, 3], [10, 3]],
+    campfires: [[5, 3]],
+  },
+  rock_wall_barrel_gate: {
+    rocks: [[3, 1], [4, 1], [5, 1], [7, 1], [8, 1], [9, 1], [3, 2], [4, 2], [5, 2], [7, 2], [8, 2], [9, 2]],
+    barrels: [[6, 1]],
+  },
+  rock_wall_double_poop: {
+    rocks: [[2, 2], [3, 2], [4, 2], [8, 2], [9, 2], [10, 2], [2, 3], [3, 3], [4, 3], [8, 3], [9, 3], [10, 3]],
+    poops: [[5, 2], [7, 2]],
+  },
+  rock_curtain_campfire: {
+    rocks: [[4, 1], [4, 2], [4, 3], [4, 4], [4, 5], [8, 1], [8, 2], [8, 3], [8, 4], [8, 5]],
+    campfires: [[6, 3]],
+    barrels: [[6, 1]],
+  },
+  rock_maze_barrel_exit: {
+    rocks: [[2, 2], [2, 3], [2, 4], [3, 2], [4, 2], [5, 2], [6, 2], [7, 2], [8, 2], [9, 2], [10, 2], [10, 3], [10, 4], [9, 4], [8, 4], [7, 4], [6, 4], [5, 4], [4, 4], [3, 4]],
+    barrels: [[3, 3]],
+    poops: [[9, 3]],
+  },
+
+  // Loot trapped behind rock rows
+  loot_behind_rocks: {
+    rocks: [[5, 2], [6, 2], [7, 2], [5, 3], [7, 3], [5, 4], [6, 4], [7, 4]],
+    pickups: [["key", 6, 3]],
+  },
+  chest_rock_vault: {
+    rocks: [[3, 2], [3, 3], [3, 4], [4, 2], [5, 2], [6, 2], [7, 2], [8, 2], [9, 2], [9, 3], [9, 4]],
+    pickups: [["penny", 10, 3]],
+  },
+  heart_rock_sanctuary: {
+    rocks: [[4, 1], [5, 1], [6, 1], [7, 1], [8, 1], [4, 2], [8, 2], [4, 3], [8, 3], [4, 4], [8, 4], [4, 5], [5, 5], [6, 5], [7, 5], [8, 5]],
+    pickups: [["half_heart", 6, 3]],
+  },
+  bomb_rock_cache: {
+    rocks: [[2, 3], [3, 3], [4, 3], [5, 3], [6, 3]],
+    pickups: [["bomb", 8, 3]],
+  },
+  twin_vault_pickups: {
+    rocks: [[5, 2], [6, 2], [7, 2], [5, 3], [7, 3], [5, 4], [6, 4], [7, 4]],
+    pickups: [["penny", 6, 3], ["half_heart", 9, 3]],
+    poops: [[6, 3]],
+  },
+
   rock_poop_split: {
     rocks: [[3, 2], [3, 4], [9, 2], [9, 4]],
     poops: [[6, 1], [6, 5]],
@@ -302,7 +358,7 @@ const PRESET_LAYOUTS = {
   drip_poop: { poops: [[6, 2], [6, 4]] },
   twin_barrels: { barrels: [[4, 3], [8, 3]] },
   spare_pillar: { rocks: [[6, 2], [6, 4]] },
-  lone_key_drop: { pickups: [["key", 6, 3]] },
+  lone_key_drop: { rocks: [[5, 3], [7, 3]], poops: [[6, 3]], pickups: [["key", 9, 3]] },
   penny_nook: { rocks: [[2, 3]], pickups: [["penny", 3, 3]] },
 
   rock_arrow: { rocks: [[6, 1], [5, 2], [6, 2], [7, 2], [6, 3]] },
@@ -507,7 +563,7 @@ export function pickPresetForCell(rand, requiredWalls, excludeBoss = true) {
   else if (roll < 0.76) group = PRESET_GROUPS.campfires;
   else if (roll < 0.84) group = PRESET_GROUPS.red_campfires;
   else if (roll < 0.90) group = PRESET_GROUPS.dense;
-  else if (roll < 0.96) group = PRESET_GROUPS.loot;
+  else if (roll < 0.94) group = PRESET_GROUPS.loot;
   else group = PRESET_GROUPS.puzzle;
 
   const pool = group.filter((id) => {
@@ -561,14 +617,34 @@ const PRESET_GROUPS = {
     "center_island", "cross_plus", "u_shape",
   ],
   loot: [
-    "west_cache", "east_vault", "north_loot", "south_stash", "single_center",
-    "twin_rocks", "campfire_center",
+    "west_cache", "east_vault", "north_loot", "south_stash",
+    "loot_behind_rocks", "heart_rock_sanctuary", "bomb_rock_cache", "twin_vault_pickups",
+    "chest_rock_vault", "lone_key_drop", "penny_nook",
   ],
   puzzle: [
     "poop_gate", "barrier_blast", "split_chamber", "chain_hall", "choke_point",
     "campfire_puzzle", "fire_ring", "blast_corridor",
+    "rock_wall_poop_gate", "rock_wall_campfire_gate", "rock_wall_barrel_gate",
+    "rock_wall_double_poop", "rock_curtain_campfire", "rock_maze_barrel_exit",
+    "loot_behind_rocks", "chest_rock_vault", "heart_rock_sanctuary", "bomb_rock_cache",
+    "twin_vault_pickups",
+    "toxic_airlock", "poop_north_seal", "barrel_chamber", "double_lock", "barrel_fuse_h",
   ],
 };
+
+export const PUZZLE_PRESET_IDS = new Set([
+  ...PRESET_GROUPS.puzzle,
+  ...PRESET_GROUPS.loot,
+]);
+
+export function isPuzzlePreset(presetId) {
+  return PUZZLE_PRESET_IDS.has(presetId);
+}
+
+export function presetHasLayoutPickups(presetId) {
+  const preset = ROOM_PRESETS[presetId];
+  return (preset?.presetPickups?.length ?? 0) > 0;
+}
 
 export function buildRoomFromPreset(presetId, doors) {
   const preset = ROOM_PRESETS[presetId];

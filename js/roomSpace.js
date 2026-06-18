@@ -7,11 +7,12 @@ import {
   WALL_THICKNESS,
 } from "./constants.js";
 import { isInDoorGap } from "./doors.js";
+import { isDoorBlocked } from "./doorLock.js";
 import { isBarrelSolid, barrelHitbox } from "./barrel.js";
 import { isRockSolid } from "./destructibles.js";
 import { findPoopHit, isPoopSolid, poopHitbox } from "./poop.js";
 import { circleIntersectsObjectHitbox, objectHitbox } from "./objectHitbox.js";
-import { BODY_RADIUS } from "./constants.js";
+import { BODY_RADIUS, CHEST_OFFSET_Y } from "./constants.js";
 
 export function getPlayAreaSize() {
   return {
@@ -86,16 +87,16 @@ export function circleHitsBoundary(cx, cy, radius, room) {
   const { width, height } = getPlayAreaSize();
 
   if (cx - radius < 0) {
-    if (!room.doors.west || !isInDoorGap("west", cx, cy, width, height)) return true;
+    if (isDoorBlocked(room, "west") || !isInDoorGap("west", cx, cy, width, height)) return true;
   }
   if (cx + radius > width) {
-    if (!room.doors.east || !isInDoorGap("east", cx, cy, width, height)) return true;
+    if (isDoorBlocked(room, "east") || !isInDoorGap("east", cx, cy, width, height)) return true;
   }
   if (cy - radius < 0) {
-    if (!room.doors.north || !isInDoorGap("north", cx, cy, width, height)) return true;
+    if (isDoorBlocked(room, "north") || !isInDoorGap("north", cx, cy, width, height)) return true;
   }
   if (cy + radius > height) {
-    if (!room.doors.south || !isInDoorGap("south", cx, cy, width, height)) return true;
+    if (isDoorBlocked(room, "south") || !isInDoorGap("south", cx, cy, width, height)) return true;
   }
 
   return false;
@@ -176,7 +177,7 @@ export function getSpawnPosition(room) {
   let y = height / 2;
 
   for (let i = 0; i < 24; i++) {
-    if (!circleHitsRoom(x, y, BODY_RADIUS, room)) return { x, y };
+    if (!circleHitsRoom(x, y + CHEST_OFFSET_Y, BODY_RADIUS, room)) return { x, y };
     x = width / 2 + (Math.random() - 0.5) * TILE_SIZE * 2;
     y = height / 2 + (Math.random() - 0.5) * TILE_SIZE * 2;
   }

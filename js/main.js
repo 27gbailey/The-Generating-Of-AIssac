@@ -12,24 +12,40 @@ import {
   getCurrentRoomData,
   checkDoorTransition,
   entryPosition,
+  isBossDoor,
 } from "./dungeon.js";
 import { drawMinimap } from "./minimap.js";
 import { initStatsHud, updateRoomHud, updateStatsHud } from "./hud.js";
 import { collectPushableEntities } from "./pushablePhysics.js";
 import { checkCampfireBurn, updateRedCampfires } from "./campfire.js";
-import { CAMPFIRE_DAMAGE } from "./constants.js";
+import { CAMPFIRE_DAMAGE, EXPLOSION_DAMAGE } from "./constants.js";
 import { sfx } from "./audio.js";
+import {
+  checkEnemyContact,
+  damageEnemiesInExplosion,
+  ENEMY_CONTACT_DAMAGE,
+} from "./enemies.js";
+import {
+  lockDoorsForEnemies,
+  refreshDoorLockState,
+  syncRoomDoorLock,
+  tryBreakDoorsFromExplosion,
+} from "./doorLock.js";
+import { tryRoomClearReward } from "./pickupSpawner.js";
 
 function syncRoomEntities(cell) {
   game.chest = cell?.chest ?? null;
   game.pickups = cell?.pickups ?? [];
   game.bombs = cell?.bombs ?? [];
   game.bloodTears = cell?.bloodTears ?? [];
+  game.enemies = cell?.enemies ?? [];
+  syncRoomDoorLock(game.room, cell);
 }
 
 function persistRoomEntities(cell) {
   if (!cell) return;
   cell.bloodTears = game.bloodTears;
+  cell.enemies = game.enemies;
 }
 
 function updateChestsAndPickups(dt) {
@@ -113,6 +129,7 @@ function regenerateFloor() {
   game.bombCooldown = 0;
   game.roomTransition = null;
   syncRoomEntities(start);
+  syncRoomDoorLock(start.room, start);
   game.player.resetAt(spawn.x, spawn.y);
   sfx.floorReset();
   updateHud();
@@ -139,11 +156,13 @@ function boot() {
     tears: [],
     bursts: [],
     bloodTears: [],
+    enemies: start.enemies ?? [],
     bombCooldown: 0,
     roomTransition: null,
     worldTime: 0,
   };
 
+  syncRoomDoorLock(start.room, start);
   updateHud();
 }
 
@@ -188,11 +207,38 @@ function tryPlaceBombFromInput() {
 }
 
 function triggerExplosion(x, y) {
+  const cell = currentCell();
   const healthBefore = game.player.stats.health;
+
+  if (
+    tryBreakDoorsFromExplosion(
+      cell,
+      game.room,
+      x,
+      y,
+      EXPLOSION_RADIUS_X,
+      EXPLOSION_RADIUS_Y,
+      (wall) => !isBossDoor(game.dungeon, game.gx, game.gy, wall)
+    )
+  ) {
+    sfx.doorBreak();
+  }
+
   resolveExplosionChain(game.room, x, y, game.bombs, game.player, (bx, by) => {
     game.bursts.push(new BombExplosion(bx, by, EXPLOSION_RADIUS_X, EXPLOSION_RADIUS_Y));
     sfx.explosion();
+    damageEnemiesInExplosion(
+      game.enemies,
+      bx,
+      by,
+      EXPLOSION_RADIUS_X,
+      EXPLOSION_RADIUS_Y,
+      EXPLOSION_DAMAGE
+    );
   });
+
+  if (cell) handleRoomClear(cell);
+
   if (game.player.stats.health < healthBefore) {
     sfx.hurt();
     checkPlayerDeath();
@@ -252,6 +298,8 @@ function finishRoomTransition() {
   game.player.x = transition.entryX;
   game.player.y = transition.entryY;
   game.dungeon.visited.add(`${game.gx},${game.gy}`);
+  lockDoorsForEnemies(cell, game.room);
+  if (cell?.doorsLocked) sfx.doorLock();
   game.roomTransition = null;
   updateHud();
 }
@@ -315,6 +363,8 @@ function update(dt) {
     }
   }
 
+  updateEnemies(dt);
+
   const newBloodTears = updateRedCampfires(game.room, dt, game.player, Math.random);
   if (newBloodTears.length) {
     game.bloodTears.push(...newBloodTears);
@@ -357,9 +407,14 @@ function update(dt) {
   }
 
   for (const t of game.tears) {
-    const burstPos = t.update(dt, game.room);
+    const burstPos = t.update(dt, game.room, game.enemies);
     if (burstPos) {
-      if (burstPos.barrelExplosion) {
+      if (burstPos.enemy) {
+        game.bursts.push(new TearBurst(burstPos.x, burstPos.y));
+        if (burstPos.killed) sfx.enemyDeath();
+        else sfx.enemyHit();
+        handleRoomClear(currentCell());
+      } else if (burstPos.barrelExplosion) {
         triggerExplosion(burstPos.barrelExplosion.x, burstPos.barrelExplosion.y);
         game.bursts.push(new TearBurst(burstPos.x, burstPos.y));
       } else if (burstPos.poop) {
@@ -394,6 +449,42 @@ function update(dt) {
   clearInputFrame(input);
 }
 
+function handleRoomClear(cell) {
+  if (!cell) return;
+  const { justCleared } = refreshDoorLockState(cell, game.room);
+  if (!justCleared) return;
+
+  const reward = tryRoomClearReward(cell, game.room);
+  if (reward) {
+    game.pickups.push(reward);
+    sfx.roomClearDrop();
+  }
+}
+
+function updateEnemies(dt) {
+  const cell = currentCell();
+  let statsChanged = false;
+
+  for (const enemy of game.enemies) {
+    const result = enemy.update(dt, game.room, game.player);
+    if (result.bloodTears?.length) {
+      game.bloodTears.push(...result.bloodTears);
+      sfx.bloodTearShoot();
+    }
+  }
+
+  const contact = checkEnemyContact(game.player, game.enemies);
+  if (contact && game.player.takeDamage(ENEMY_CONTACT_DAMAGE)) {
+    sfx.hurt();
+    statsChanged = true;
+    checkPlayerDeath();
+  }
+
+  handleRoomClear(cell);
+  if (statsChanged) updateStatsHud(game.player.stats);
+  persistRoomEntities(cell);
+}
+
 function drawWorldContents(layout, bombs = game.bombs, screenOverride = null) {
   if (game.chest) game.chest.draw(ctx, layout);
 
@@ -415,6 +506,10 @@ function drawWorldContents(layout, bombs = game.bombs, screenOverride = null) {
 
   for (const burst of game.bursts) {
     burst.draw(ctx, layout);
+  }
+
+  for (const enemy of game.enemies) {
+    enemy.draw(ctx, layout);
   }
 
   game.player.draw(ctx, layout, screenOverride);

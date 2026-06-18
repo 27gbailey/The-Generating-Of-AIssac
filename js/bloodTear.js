@@ -23,10 +23,11 @@ export class BloodTear {
     const nextX = this.x + this.vx * dt;
     const nextY = this.y + this.vy * dt;
 
+    const chest = player?.chestPosition?.() ?? { x: player?.x ?? 0, y: player?.y ?? 0 };
     if (
       player &&
       !player.isDying &&
-      Math.hypot(nextX - player.x, nextY - player.y) < this.radius + (player.bodyRadius ?? BODY_RADIUS)
+      Math.hypot(nextX - chest.x, nextY - chest.y) < this.radius + (player.bodyRadius ?? BODY_RADIUS)
     ) {
       this.state = "dead";
       return { x: this.x, y: this.y, hitPlayer: true };
@@ -73,8 +74,9 @@ export class BloodTear {
 }
 
 export function spawnBloodTearFromCampfire(cx, cy, player, rand) {
-  let dx = player.x - cx;
-  let dy = player.y - cy;
+  const target = player.chestPosition?.() ?? player;
+  let dx = target.x - cx;
+  let dy = target.y - cy;
   if (Math.hypot(dx, dy) < 8) {
     const angle = rand() * Math.PI * 2;
     dx = Math.cos(angle);

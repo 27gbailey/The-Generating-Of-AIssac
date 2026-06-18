@@ -140,7 +140,8 @@ export function applyExplosionKnockback(player, cx, cy, radiusX = EXPLOSION_RADI
 }
 
 export function applyExplosionDamage(player, cx, cy, radiusX = EXPLOSION_RADIUS_X, radiusY = EXPLOSION_RADIUS_Y) {
-  if (!pointInExplosion(player.x, player.y, cx, cy, radiusX, radiusY)) return false;
+  const chest = player.chestPosition?.() ?? { x: player.x, y: player.y };
+  if (!pointInExplosion(chest.x, chest.y, cx, cy, radiusX, radiusY)) return false;
   return player.takeDamage(EXPLOSION_DAMAGE);
 }
 

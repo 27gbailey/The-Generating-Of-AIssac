@@ -7,13 +7,7 @@ import {
 } from "./constants.js";
 import { Chest } from "./chest.js";
 import { circleHitsRoom } from "./roomSpace.js";
-
-const CHEST_ROOM_PRESETS = new Set([
-  "split_chamber", "barrier_blast", "chain_hall", "double_lock", "barrel_chamber",
-  "poop_north_seal", "toxic_airlock", "barrel_fuse_h", "barrel_fuse_v", "poop_gate",
-  "west_cache", "east_vault", "north_loot", "south_stash", "campfire_puzzle",
-  "single_center", "twin_rocks", "corner_rocks", "poop_corners", "edge_rocks",
-]);
+import { isPuzzlePreset, presetHasLayoutPickups } from "./roomPresets.js";
 
 function findChestPosition(room, rand) {
   const candidates = [];
@@ -24,41 +18,46 @@ function findChestPosition(room, rand) {
       const x = tx * TILE_SIZE + TILE_SIZE / 2;
       const y = ty * TILE_SIZE + TILE_SIZE / 2;
       if (circleHitsRoom(x, y, CHEST_RADIUS, room)) continue;
-      let score = Math.min(tx, ty, ROOM_WIDTH - 1 - tx, ROOM_HEIGHT - 1 - ty);
-      for (let dy = -2; dy <= 2; dy++) {
-        for (let dx = -2; dx <= 2; dx++) {
+
+      let score = 0;
+      for (let dy = -3; dy <= 3; dy++) {
+        for (let dx = -3; dx <= 3; dx++) {
           const c = room.grid[ty + dy]?.[tx + dx];
-          if (c === TILE.ROCK || c === TILE.POOP || c === TILE.BARREL) score += 1;
+          if (c === TILE.ROCK || c === TILE.POOP || c === TILE.BARREL) score += 2;
+          if (c === TILE.CAMPFIRE || c === TILE.RED_CAMPFIRE) score += 1;
         }
       }
+      if (score === 0) continue;
+
+      const centerDist = Math.hypot(tx - 6, ty - 3);
+      score += centerDist * 0.35 + rand() * 1.5;
       candidates.push({ x, y, score });
     }
   }
   if (!candidates.length) return null;
   candidates.sort((a, b) => b.score - a.score);
-  return candidates[Math.floor(rand() * Math.min(4, candidates.length))];
+  return candidates[Math.floor(rand() * Math.min(3, candidates.length))];
 }
 
 export function spawnChestsInDungeon(dungeon, rand) {
   const cells = Object.values(dungeon.rooms).filter((c) => !c.isStart && !c.isBoss);
-  const eligible = cells.filter((c) => CHEST_ROOM_PRESETS.has(c.presetId));
-  const chosen = new Set();
+  const eligible = cells.filter(
+    (c) =>
+      isPuzzlePreset(c.presetId) &&
+      !presetHasLayoutPickups(c.presetId) &&
+      !c.chest
+  );
 
   const shuffled = [...eligible].sort(() => rand() - 0.5);
+  let placed = 0;
+
   for (const cell of shuffled) {
-    if (chosen.size >= 3) break;
+    if (placed >= 4) break;
+    if (rand() > 0.55) continue;
+
     const pos = findChestPosition(cell.room, rand);
     if (!pos) continue;
     cell.chest = new Chest(pos.x, pos.y, rand);
-    chosen.add(`${cell.gx},${cell.gy}`);
-  }
-
-  if (chosen.size === 0) {
-    for (const cell of cells.sort(() => rand() - 0.5)) {
-      const pos = findChestPosition(cell.room, rand);
-      if (!pos) continue;
-      cell.chest = new Chest(pos.x, pos.y, rand);
-      break;
-    }
+    placed++;
   }
 }

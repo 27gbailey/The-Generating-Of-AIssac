@@ -55,8 +55,15 @@ export const BARREL_HITS_TO_DESTROY = 3;
 
 export const CAMPFIRE_HITS_TO_EXTINGUISH = 8;
 export const CAMPFIRE_DAMAGE = 1;
-export const CAMPFIRE_FIRE_RADIUS = 12;
+/** Burn hitbox covers nearly the full tile (visual flame is larger). */
+export const CAMPFIRE_FIRE_RADIUS = TILE_SIZE / 2 - 2;
 export const BLOOD_TEAR_DAMAGE = 1;
+
+export const TEAR_DAMAGE = 3.5;
+export const ENEMY_CONTACT_DAMAGE = 1;
+export const HORF_HP = 20;
+export const GAPER_HP = 20;
+export const DIP_HP = 10;
 
 export const PICKUP_PENNY_RADIUS = 12;
 export const PICKUP_KEY_RADIUS = 13;
@@ -69,7 +76,9 @@ export const CHEST_RADIUS = 28;
 export const EXPLOSION_DAMAGE = 2;
 export const INVINCIBILITY_DURATION = 0.5;
 
-export const BODY_RADIUS = 13;
+/** Collision / damage hitbox centered on Isaac's chest. */
+export const CHEST_OFFSET_Y = 12;
+export const BODY_RADIUS = 11;
 export const HEAD_RADIUS = 11;
 
 export const DIRECTIONS = {

@@ -6,6 +6,8 @@ export {
   getBlockedWalls,
   getRoomCatalogEntry,
   listAllPresetIds,
+  isPuzzlePreset,
+  presetHasLayoutPickups,
   pickPresetForCell,
   wallsConflictWithNeighbors,
 } from "./roomPresets.js";
