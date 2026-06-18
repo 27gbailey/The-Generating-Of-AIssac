@@ -40,8 +40,8 @@ export const BOMB_FUSE = 2.6;
 export const BOMB_MAX_PER_ROOM = 3;
 export const BOMB_PLACE_COOLDOWN = 0.45;
 
-export const EXPLOSION_RADIUS_X = 102;
-export const EXPLOSION_RADIUS_Y = 96;
+export const EXPLOSION_RADIUS_X = 84;
+export const EXPLOSION_RADIUS_Y = 78;
 export const EXPLOSION_KNOCKBACK = 480;
 
 /** Larger corner radius for drawing objects (hitbox stays square-ish). */
@@ -55,6 +55,7 @@ export const BARREL_HITS_TO_DESTROY = 3;
 
 export const CAMPFIRE_HITS_TO_EXTINGUISH = 8;
 export const CAMPFIRE_DAMAGE = 1;
+export const CAMPFIRE_FIRE_RADIUS = 12;
 export const BLOOD_TEAR_DAMAGE = 1;
 
 export const PICKUP_PENNY_RADIUS = 12;

@@ -1,4 +1,5 @@
 import {
+  CAMPFIRE_FIRE_RADIUS,
   CAMPFIRE_HITS_TO_EXTINGUISH,
   ROOM_HEIGHT,
   ROOM_WIDTH,
@@ -122,8 +123,7 @@ export function checkCampfireBurn(player, room) {
     for (let tx = minTx; tx <= maxTx; tx++) {
       if (!isCampfireBurning(room, tx, ty)) continue;
       const center = campfireFireCenter(tx, ty);
-      const fireR = 12 * campfireIntensity(room, tx, ty);
-      if (Math.hypot(player.x - center.x, player.y - center.y) < fireR + r * 0.5) {
+      if (Math.hypot(player.x - center.x, player.y - center.y) < CAMPFIRE_FIRE_RADIUS + r * 0.5) {
         return true;
       }
     }
@@ -175,24 +175,25 @@ function drawFirewood(ctx, cx, cy) {
   ctx.fillRect(cx - 16, cy + 8, 32, 6);
 }
 
-function drawFlame(ctx, cx, cy, intensity, time, red, flickerFlash = 0) {
+function drawFlame(ctx, cx, cy, hits, time, red, flickerFlash = 0) {
+  const visualIntensity = Math.max(0.3, 1 - hits / CAMPFIRE_HITS_TO_EXTINGUISH);
   const flicker = 0.85 + Math.sin(time * 14) * 0.08 + Math.sin(time * 23) * 0.05;
   const flashBoost = flickerFlash > 0 ? 1.15 + Math.sin(time * 40) * 0.12 : 0;
-  const scale = intensity * flicker * (1 + flashBoost * 0.25);
-  const fh = 22 * scale;
-  const fw = 14 * scale;
+  const scale = visualIntensity * flicker * (1 + flashBoost * 0.25);
+  const fh = 32 * scale;
+  const fw = 20 * scale;
 
   ctx.save();
   ctx.globalCompositeOperation = "lighter";
 
   const grad = ctx.createRadialGradient(cx, cy - fh * 0.35, 0, cx, cy - fh * 0.2, fw * 1.4);
   if (red) {
-    grad.addColorStop(0, `rgba(255, 180, 180, ${0.9 * intensity})`);
-    grad.addColorStop(0.4, `rgba(220, 40, 40, ${0.65 * intensity})`);
+    grad.addColorStop(0, `rgba(255, 180, 180, ${0.92 * visualIntensity})`);
+    grad.addColorStop(0.4, `rgba(220, 40, 40, ${0.68 * visualIntensity})`);
     grad.addColorStop(1, "rgba(120, 10, 10, 0)");
   } else {
-    grad.addColorStop(0, `rgba(255, 240, 160, ${0.85 * intensity})`);
-    grad.addColorStop(0.4, `rgba(255, 140, 40, ${0.55 * intensity})`);
+    grad.addColorStop(0, `rgba(255, 240, 160, ${0.88 * visualIntensity})`);
+    grad.addColorStop(0.4, `rgba(255, 140, 40, ${0.58 * visualIntensity})`);
     grad.addColorStop(1, "rgba(180, 40, 10, 0)");
   }
   ctx.fillStyle = grad;
@@ -203,7 +204,7 @@ function drawFlame(ctx, cx, cy, intensity, time, red, flickerFlash = 0) {
   ctx.quadraticCurveTo(cx + fw, cy - fh * 0.2, cx, cy - fh);
   ctx.fill();
 
-  const coreColor = red ? `rgba(255, 100, 100, ${0.45 * intensity})` : `rgba(255, 200, 80, ${0.35 * intensity})`;
+  const coreColor = red ? `rgba(255, 100, 100, ${0.5 * visualIntensity})` : `rgba(255, 200, 80, ${0.4 * visualIntensity})`;
   ctx.fillStyle = coreColor;
   ctx.beginPath();
   ctx.arc(cx, cy - fh * 0.45, fw * 0.35, 0, Math.PI * 2);
@@ -211,7 +212,7 @@ function drawFlame(ctx, cx, cy, intensity, time, red, flickerFlash = 0) {
 
   ctx.restore();
 
-  const glowColor = red ? `rgba(200, 30, 30, ${0.14 * intensity})` : `rgba(255, 120, 30, ${0.12 * intensity})`;
+  const glowColor = red ? `rgba(200, 30, 30, ${0.16 * visualIntensity})` : `rgba(255, 120, 30, ${0.14 * visualIntensity})`;
   ctx.fillStyle = glowColor;
   ctx.beginPath();
   ctx.ellipse(cx, cy + 10, fw * 1.6, fh * 0.25, 0, 0, Math.PI * 2);
@@ -234,6 +235,5 @@ export function drawCampfire(ctx, px, py, hits, extinguished, time = 0, options 
     return;
   }
 
-  const intensity = 1 - hits / CAMPFIRE_HITS_TO_EXTINGUISH;
-  drawFlame(ctx, cx, cy, intensity, time, isRed, flicker);
+  drawFlame(ctx, cx, cy, hits, time, isRed, flicker);
 }

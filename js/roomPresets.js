@@ -33,6 +33,7 @@ function buildLayout({
   redCampfires = [],
   pickups = [],
   skipPerimeter = false,
+  perimeter = "normal",
 } = {}) {
   const grid = createEmptyGrid();
   for (const [x, y] of rocks) place(grid, x, y, TILE.ROCK);
@@ -41,7 +42,7 @@ function buildLayout({
   for (const [x, y] of barrels) place(grid, x, y, TILE.BARREL);
   for (const [x, y] of campfires) place(grid, x, y, TILE.CAMPFIRE);
   for (const [x, y] of redCampfires) place(grid, x, y, TILE.RED_CAMPFIRE);
-  if (!skipPerimeter) applyPerimeterRing(grid);
+  if (!skipPerimeter) applyPerimeterRing(grid, perimeter);
   return { grid, pickups: normalizePickups(pickups) };
 }
 
@@ -55,59 +56,71 @@ function isDoorTile(x, y) {
   return DOOR_TILES.has(`${x},${y}`);
 }
 
-function perimeterTiles() {
-  const tiles = [];
-  for (let x = 1; x < ROOM_WIDTH - 1; x++) {
-    tiles.push([x, 1], [x, ROOM_HEIGHT - 2]);
-  }
-  for (let y = 1; y < ROOM_HEIGHT - 1; y++) {
-    tiles.push([1, y], [ROOM_WIDTH - 2, y]);
-  }
-  return tiles;
-}
+/** Outermost playable tiles — flush against the walls. */
+const ORGANIZED_EDGE_SLOTS = [
+  [0, 0], [12, 0], [0, 6], [12, 6],
+  [3, 0], [9, 0], [3, 6], [9, 6],
+  [0, 1], [0, 5], [12, 1], [12, 5],
+  [1, 0], [11, 0], [1, 6], [11, 6],
+  [6, 0], [6, 6], [0, 2], [12, 4],
+];
 
-/** Guaranteed edge accents — at least 4 objects on the room rim when space allows. */
-function applyPerimeterRing(grid) {
-  const open = [];
-  for (const [x, y] of perimeterTiles()) {
+const PERIMETER_COUNTS = { sparse: 2, normal: 4, dense: 8 };
+
+/** Organized edge accents on the wall-adjacent ring (not the inner ring). */
+function applyPerimeterRing(grid, density = "normal") {
+  const maxCount = PERIMETER_COUNTS[density] ?? PERIMETER_COUNTS.normal;
+  const types = [TILE.ROCK, TILE.ROCK, TILE.POOP, TILE.CAMPFIRE, TILE.ROCK, TILE.CAMPFIRE, TILE.POOP, TILE.ROCK];
+
+  let placed = 0;
+  for (let i = 0; i < ORGANIZED_EDGE_SLOTS.length && placed < maxCount; i++) {
+    const [x, y] = ORGANIZED_EDGE_SLOTS[i];
     if (isDoorTile(x, y)) continue;
     if (grid[y][x] !== TILE.FLOOR) continue;
-    open.push([x, y]);
-  }
-  if (open.length === 0) return;
-
-  open.sort((a, b) => (a[0] * 17 + a[1] * 31) - (b[0] * 17 + b[1] * 31));
-
-  const types = [TILE.ROCK, TILE.ROCK, TILE.POOP, TILE.BARREL, TILE.CAMPFIRE];
-  const minCount = Math.min(4, open.length);
-  const extraCount = Math.min(open.length, Math.floor(open.length * 0.4));
-  const total = Math.max(minCount, extraCount);
-
-  for (let i = 0; i < total; i++) {
-    const [x, y] = open[i];
-    if (grid[y][x] !== TILE.FLOOR) continue;
-    place(grid, x, y, types[(x * 13 + y * 7 + i) % types.length]);
+    place(grid, x, y, types[placed % types.length]);
+    placed++;
   }
 }
 
 const PRESET_LAYOUTS = {
   empty: { skipPerimeter: true },
 
+  // Sparse organized rooms
+  open_floor: { perimeter: "sparse" },
+  sparse_lone_rock: { rocks: [[6, 3]], perimeter: "sparse" },
+  sparse_twin: { rocks: [[5, 3], [7, 3]], perimeter: "sparse" },
+  sparse_campfire: { campfires: [[6, 3]], perimeter: "sparse" },
+
+  // Dense organized rooms
+  dense_rock_row: { rocks: [[4, 3], [6, 3], [8, 3]], perimeter: "dense" },
+  dense_rock_grid: {
+    rocks: [[4, 2], [6, 2], [8, 2], [4, 4], [6, 4], [8, 4]],
+    perimeter: "dense",
+  },
+  dense_poop_cross: {
+    poops: [[6, 2], [6, 4], [5, 3], [7, 3]],
+    perimeter: "dense",
+  },
+  dense_campfire_ring: {
+    campfires: [[6, 3]],
+    perimeter: "dense",
+  },
+
   // Simple single-feature rooms
   single_poop: { poops: [[6, 3]] },
-  single_barrel: { barrels: [[6, 3]] },
-  edge_rocks: { rocks: [[1, 2], [1, 3], [1, 4], [11, 2], [11, 3], [11, 4]] },
-  edge_barrels: { barrels: [[2, 1], [10, 1], [2, 5], [10, 5]] },
-  edge_campfires: { campfires: [[3, 1], [9, 1], [3, 5], [9, 5]] },
+  single_barrel: { barrels: [[6, 3]], skipPerimeter: true },
+  edge_rocks: { rocks: [[0, 2], [0, 3], [0, 4], [12, 2], [12, 3], [12, 4]] },
+  edge_barrels: { barrels: [[0, 1], [12, 1], [0, 5], [12, 5]], skipPerimeter: true },
+  edge_campfires: { campfires: [[0, 1], [12, 1], [0, 5], [12, 5]] },
 
   // Rock-focused layouts
   single_center: { rocks: [[6, 3]] },
   twin_rocks: { rocks: [[4, 3], [8, 3]] },
   diagonal_pair: { rocks: [[3, 2], [9, 4]] },
-  corner_rocks: { rocks: [[2, 1], [10, 1], [2, 5], [10, 5]] },
-  north_arc: { rocks: [[3, 1], [4, 2], [6, 1], [8, 2], [9, 1]] },
-  south_arc: { rocks: [[3, 5], [4, 4], [6, 5], [8, 4], [9, 5]] },
-  side_pillars: { rocks: [[2, 2], [2, 4], [10, 2], [10, 4]] },
+  corner_rocks: { rocks: [[0, 0], [12, 0], [0, 6], [12, 6]] },
+  north_arc: { rocks: [[3, 0], [4, 0], [6, 0], [8, 0], [9, 0]] },
+  south_arc: { rocks: [[3, 6], [4, 6], [6, 6], [8, 6], [9, 6]] },
+  side_pillars: { rocks: [[0, 2], [0, 4], [12, 2], [12, 4]] },
   cross_plus: {
     rocks: [[6, 1], [6, 2], [6, 4], [6, 5], [4, 3], [5, 3], [7, 3], [8, 3]],
   },
@@ -117,9 +130,9 @@ const PRESET_LAYOUTS = {
   center_island: {
     rocks: [[5, 2], [6, 2], [7, 2], [5, 3], [7, 3], [5, 4], [6, 4], [7, 4]],
   },
-  north_wall: { rocks: [[2, 1], [3, 1], [4, 1], [8, 1], [9, 1], [10, 1]] },
-  south_wall: { rocks: [[2, 5], [3, 5], [4, 5], [8, 5], [9, 5], [10, 5]] },
-  alcove: { rocks: [[1, 2], [1, 3], [1, 4], [11, 2], [11, 3], [11, 4]] },
+  north_wall: { rocks: [[2, 0], [3, 0], [4, 0], [8, 0], [9, 0], [10, 0]] },
+  south_wall: { rocks: [[2, 6], [3, 6], [4, 6], [8, 6], [9, 6], [10, 6]] },
+  alcove: { rocks: [[0, 2], [0, 3], [0, 4], [12, 2], [12, 3], [12, 4]] },
   zigzag: { rocks: [[3, 1], [5, 2], [7, 3], [5, 4], [3, 5]] },
   sparse_ring: { rocks: [[5, 1], [7, 1], [9, 3], [7, 5], [5, 5], [3, 3]] },
   rock_cluster: { rocks: [[5, 2], [6, 2], [7, 2], [6, 3], [6, 4]] },
@@ -382,22 +395,22 @@ const PRESET_LAYOUTS = {
     rocks: [[6, 3]],
   },
 
-  red_corner_lurker: { redCampfires: [[2, 1]] },
-  red_corner_pair: { redCampfires: [[2, 1], [10, 5]] },
-  red_four_corners: { redCampfires: [[2, 1], [10, 1], [2, 5], [10, 5]] },
+  red_corner_lurker: { redCampfires: [[0, 1]] },
+  red_corner_pair: { redCampfires: [[0, 0], [12, 6]] },
+  red_four_corners: { redCampfires: [[0, 0], [12, 0], [0, 6], [12, 6]] },
   red_center_cluster: { redCampfires: [[5, 3], [6, 3], [7, 3]] },
   red_center_pyramid: { redCampfires: [[6, 2], [5, 3], [6, 3], [7, 3]] },
   red_mixed_corners: {
-    redCampfires: [[2, 1], [10, 1], [2, 5], [10, 5]],
+    redCampfires: [[0, 0], [12, 0], [0, 6], [12, 6]],
     campfires: [[6, 3]],
   },
   red_scatter_mixed: {
-    redCampfires: [[4, 2], [8, 4], [3, 5]],
-    campfires: [[6, 3], [9, 2]],
+    redCampfires: [[0, 2], [12, 4], [3, 6]],
+    campfires: [[6, 3], [9, 0]],
   },
   red_flank_guards: {
-    redCampfires: [[3, 3], [9, 3]],
-    campfires: [[6, 1], [6, 5]],
+    redCampfires: [[0, 3], [12, 3]],
+    campfires: [[6, 0], [6, 6]],
   },
   red_hell_hearth: {
     redCampfires: [[5, 2], [7, 2], [6, 3], [5, 4], [7, 4]],
@@ -415,7 +428,8 @@ const PRESET_LAYOUTS = {
     ],
     rocks: [[6, 3]],
     poops: [[4, 3], [8, 3]],
-    barrels: [[2, 4], [10, 4]],
+    redCampfires: [[0, 2], [12, 2], [2, 0], [10, 0]],
+    skipPerimeter: true,
   },
 };
 
@@ -485,13 +499,15 @@ export function wallsConflictWithNeighbors(blocked, neighborWalls) {
 export function pickPresetForCell(rand, requiredWalls, excludeBoss = true) {
   const roll = rand();
   let group;
-  if (roll < 0.32) group = PRESET_GROUPS.minimal;
+  if (roll < 0.22) group = PRESET_GROUPS.minimal;
+  else if (roll < 0.34) group = PRESET_GROUPS.sparse;
   else if (roll < 0.52) group = PRESET_GROUPS.rocks;
   else if (roll < 0.64) group = PRESET_GROUPS.poops;
-  else if (roll < 0.76) group = PRESET_GROUPS.barrels;
-  else if (roll < 0.84) group = PRESET_GROUPS.campfires;
-  else if (roll < 0.92) group = PRESET_GROUPS.red_campfires;
-  else if (roll < 0.97) group = PRESET_GROUPS.loot;
+  else if (roll < 0.68) group = PRESET_GROUPS.barrels;
+  else if (roll < 0.76) group = PRESET_GROUPS.campfires;
+  else if (roll < 0.84) group = PRESET_GROUPS.red_campfires;
+  else if (roll < 0.90) group = PRESET_GROUPS.dense;
+  else if (roll < 0.96) group = PRESET_GROUPS.loot;
   else group = PRESET_GROUPS.puzzle;
 
   const pool = group.filter((id) => {
@@ -516,20 +532,21 @@ export function pickPresetForCell(rand, requiredWalls, excludeBoss = true) {
 
 const PRESET_GROUPS = {
   minimal: [
-    "empty", "single_center", "twin_rocks", "corner_rocks", "side_pillars",
-    "north_wall", "south_wall", "alcove", "sparse_ring", "edge_rocks",
+    "empty", "single_center", "twin_rocks", "open_floor", "sparse_lone_rock",
+  ],
+  sparse: [
+    "open_floor", "sparse_lone_rock", "sparse_twin", "sparse_campfire",
+    "single_center", "single_poop",
   ],
   rocks: [
-    "single_center", "twin_rocks", "corner_rocks", "rock_cluster", "north_arc",
-    "south_arc", "side_pillars", "north_wall", "south_wall", "edge_rocks",
+    "corner_rocks", "north_wall", "south_wall", "alcove", "side_pillars",
+    "edge_rocks", "north_arc", "south_arc", "rock_cluster",
   ],
   poops: [
     "single_poop", "poop_corners", "poop_stacks", "poop_ring", "poop_cross",
-    "edge_rocks",
   ],
   barrels: [
-    "single_barrel", "edge_barrels", "barrel_triangle", "barrel_scatter",
-    "barrel_north_row", "barrel_south_row",
+    "single_barrel", "barrel_triangle", "lone_barrel",
   ],
   campfires: [
     "campfire_center", "campfire_north", "twin_campfires", "edge_campfires",
@@ -538,6 +555,10 @@ const PRESET_GROUPS = {
     "red_corner_lurker", "red_corner_pair", "red_four_corners", "red_center_cluster",
     "red_center_pyramid", "red_mixed_corners", "red_scatter_mixed", "red_flank_guards",
     "red_hell_hearth",
+  ],
+  dense: [
+    "dense_rock_row", "dense_rock_grid", "dense_poop_cross", "dense_campfire_ring",
+    "center_island", "cross_plus", "u_shape",
   ],
   loot: [
     "west_cache", "east_vault", "north_loot", "south_stash", "single_center",
