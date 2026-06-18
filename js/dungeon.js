@@ -278,7 +278,6 @@ export function generateDungeon(seed = Date.now()) {
       collectedPickups: cell.collectedPickups,
       chest: cell.chest ?? null,
       room: built,
-      enemies: cell.enemies ?? [],
       doorsLocked: cell.doorsLocked ?? false,
       brokenDoors: cell.brokenDoors ?? createBrokenDoors(),
       hadCombatEnemies: cell.hadCombatEnemies ?? false,
