@@ -1,6 +1,9 @@
 import {
+  ATTACK_FLY_HP,
+  POOTER_FLY_HP,
   DIP_HP,
   ENEMY_CONTACT_DAMAGE,
+  FLY_HP,
   GAPER_HP,
   HORF_HP,
   ROOM_HEIGHT,
@@ -21,6 +24,13 @@ const GAPER_SPEED = 95;
 const DIP_BURST_SPEED = 180;
 const DIP_BURST_TIME = 0.22;
 const DIP_PAUSE_TIME = 0.85;
+const FLY_WANDER_SPEED = 38;
+const ATTACK_FLY_SPEED = 78;
+const POOTER_FLY_WANDER_SPEED = 34;
+const POOTER_FLY_CHASE_SPEED = 48;
+const POOTER_FLY_CHASE_RANGE = TILE_SIZE * 4.5;
+const POOTER_FLY_SHOOT_RANGE = TILE_SIZE * 8.5;
+const POOTER_FLY_SHOOT_COOLDOWN = 2.1;
 
 function isSolidForLineOfSight(room, tx, ty) {
   const code = room.grid[ty]?.[tx];
@@ -54,16 +64,17 @@ export function hasLineOfSight(room, x0, y0, x1, y1) {
 
 function tryMove(entity, nextX, nextY, room) {
   const r = entity.radius;
-  if (!circleHitsRoom(nextX, nextY, r, room)) {
+  const opts = entity.flying ? { flying: true } : {};
+  if (!circleHitsRoom(nextX, nextY, r, room, opts)) {
     entity.x = nextX;
     entity.y = nextY;
     return true;
   }
-  if (!circleHitsRoom(nextX, entity.y, r, room)) {
+  if (!circleHitsRoom(nextX, entity.y, r, room, opts)) {
     entity.x = nextX;
     return true;
   }
-  if (!circleHitsRoom(entity.x, nextY, r, room)) {
+  if (!circleHitsRoom(entity.x, nextY, r, room, opts)) {
     entity.y = nextY;
     return true;
   }
@@ -82,6 +93,8 @@ export class Enemy {
     this.hitFlash = 0;
     this.vx = 0;
     this.vy = 0;
+    this.flying = false;
+    this.harmless = false;
   }
 
   takeDamage(amount) {
@@ -335,6 +348,213 @@ export class Dip extends Enemy {
   }
 }
 
+function drawFlyWings(ctx, sx, sy, phase, tint = "rgba(220, 220, 230, 0.55)") {
+  const flap = Math.sin(phase * 14) * 5;
+  ctx.fillStyle = tint;
+  ctx.beginPath();
+  ctx.ellipse(sx - 9, sy - 1 - flap, 6, 10, -0.45, 0, Math.PI * 2);
+  ctx.ellipse(sx + 9, sy - 1 - flap, 6, 10, 0.45, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawFlyBall(ctx, sx, sy, phase, { fill, stroke, radius = 8, wingTint, eyes = null }) {
+  drawFlyWings(ctx, sx, sy, phase, wingTint);
+
+  ctx.fillStyle = fill;
+  ctx.strokeStyle = stroke;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.arc(sx, sy, radius, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = "rgba(255, 255, 255, 0.18)";
+  ctx.beginPath();
+  ctx.arc(sx - radius * 0.28, sy - radius * 0.32, radius * 0.32, 0, Math.PI * 2);
+  ctx.fill();
+
+  if (eyes) {
+    ctx.fillStyle = eyes;
+    ctx.beginPath();
+    ctx.arc(sx - 3, sy - 1, 2.2, 0, Math.PI * 2);
+    ctx.arc(sx + 3, sy - 1, 2.2, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+export class Fly extends Enemy {
+  constructor(x, y) {
+    super("fly", x, y, FLY_HP);
+    this.flying = true;
+    this.harmless = true;
+    this.radius = 9;
+    this.wanderTimer = Math.random() * 2;
+    this.wanderDirX = 0;
+    this.wanderDirY = 0;
+    this.wingPhase = Math.random() * Math.PI * 2;
+  }
+
+  pickWanderDirection() {
+    const angle = Math.random() * Math.PI * 2;
+    this.wanderDirX = Math.cos(angle);
+    this.wanderDirY = Math.sin(angle);
+    this.wanderTimer = 1.1 + Math.random() * 2.2;
+  }
+
+  update(dt, room, player) {
+    if (!this.alive) return { bloodTears: [] };
+    if (this.hitFlash > 0) this.hitFlash -= dt;
+    this.wingPhase += dt;
+
+    this.wanderTimer -= dt;
+    if (this.wanderTimer <= 0) this.pickWanderDirection();
+
+    const step = FLY_WANDER_SPEED * dt;
+    tryMove(this, this.x + this.wanderDirX * step, this.y + this.wanderDirY * step, room);
+
+    return { bloodTears: [] };
+  }
+
+  draw(ctx, layout) {
+    if (!this.alive) return;
+    const sx = layout.floorX + this.x;
+    const sy = layout.floorY + this.y - 2;
+
+    ctx.save();
+    drawFlyBall(ctx, sx, sy, this.wingPhase, {
+      fill: "#1a1a1a",
+      stroke: "#050505",
+      radius: 8,
+      wingTint: "rgba(200, 200, 210, 0.5)",
+    });
+    ctx.restore();
+    super.draw(ctx, layout);
+  }
+}
+
+export class AttackFly extends Enemy {
+  constructor(x, y) {
+    super("attack_fly", x, y, ATTACK_FLY_HP);
+    this.flying = true;
+    this.radius = 10;
+    this.wingPhase = Math.random() * Math.PI * 2;
+  }
+
+  update(dt, room, player) {
+    if (!this.alive) return { bloodTears: [] };
+    if (this.hitFlash > 0) this.hitFlash -= dt;
+    this.wingPhase += dt;
+
+    const chest = player.chestPosition?.() ?? { x: player.x, y: player.y };
+    let dx = chest.x - this.x;
+    let dy = chest.y - this.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist > 4) {
+      dx /= dist;
+      dy /= dist;
+      const step = ATTACK_FLY_SPEED * dt;
+      tryMove(this, this.x + dx * step, this.y + dy * step, room);
+      this.vx = dx * ATTACK_FLY_SPEED * 0.4;
+      this.vy = dy * ATTACK_FLY_SPEED * 0.4;
+    }
+
+    return { bloodTears: [] };
+  }
+
+  draw(ctx, layout) {
+    if (!this.alive) return;
+    const sx = layout.floorX + this.x;
+    const sy = layout.floorY + this.y - 2;
+
+    ctx.save();
+    drawFlyBall(ctx, sx, sy, this.wingPhase, {
+      fill: "#c02828",
+      stroke: "#701010",
+      radius: 9,
+      wingTint: "rgba(255, 170, 160, 0.52)",
+    });
+    ctx.restore();
+    super.draw(ctx, layout);
+  }
+}
+
+export class PooterFly extends Enemy {
+  constructor(x, y) {
+    super("pooter_fly", x, y, POOTER_FLY_HP);
+    this.flying = true;
+    this.radius = 10;
+    this.wingPhase = Math.random() * Math.PI * 2;
+    this.wanderTimer = Math.random() * 2;
+    this.wanderDirX = 0;
+    this.wanderDirY = 0;
+    this.shootTimer = 0.8 + Math.random();
+  }
+
+  pickWanderDirection() {
+    const angle = Math.random() * Math.PI * 2;
+    this.wanderDirX = Math.cos(angle);
+    this.wanderDirY = Math.sin(angle);
+    this.wanderTimer = 1.3 + Math.random() * 2;
+  }
+
+  update(dt, room, player) {
+    if (!this.alive) return { bloodTears: [] };
+    if (this.hitFlash > 0) this.hitFlash -= dt;
+    this.wingPhase += dt;
+
+    const bloodTears = [];
+    const chest = player.chestPosition?.() ?? { x: player.x, y: player.y };
+    const dist = Math.hypot(chest.x - this.x, chest.y - this.y);
+    const canSee = hasLineOfSight(room, this.x, this.y, chest.x, chest.y);
+
+    if (dist <= POOTER_FLY_CHASE_RANGE) {
+      let dx = chest.x - this.x;
+      let dy = chest.y - this.y;
+      if (dist > 4) {
+        dx /= dist;
+        dy /= dist;
+        const step = POOTER_FLY_CHASE_SPEED * dt;
+        tryMove(this, this.x + dx * step, this.y + dy * step, room);
+      }
+    } else {
+      this.wanderTimer -= dt;
+      if (this.wanderTimer <= 0) this.pickWanderDirection();
+      const step = POOTER_FLY_WANDER_SPEED * dt;
+      tryMove(this, this.x + this.wanderDirX * step, this.y + this.wanderDirY * step, room);
+    }
+
+    this.shootTimer -= dt;
+    if (this.shootTimer <= 0 && canSee && dist <= POOTER_FLY_SHOOT_RANGE) {
+      const dx = chest.x - this.x;
+      const dy = chest.y - this.y;
+      const maxRange = TILE_SIZE * (4.5 + Math.random() * 2.5);
+      bloodTears.push(new BloodTear(this.x, this.y - 3, dx, dy, maxRange));
+      this.shootTimer = POOTER_FLY_SHOOT_COOLDOWN + Math.random() * 0.7;
+    } else if (this.shootTimer <= 0) {
+      this.shootTimer = 0.4;
+    }
+
+    return { bloodTears };
+  }
+
+  draw(ctx, layout) {
+    if (!this.alive) return;
+    const sx = layout.floorX + this.x;
+    const sy = layout.floorY + this.y - 2;
+
+    ctx.save();
+    drawFlyBall(ctx, sx, sy, this.wingPhase, {
+      fill: "#7a5230",
+      stroke: "#4a3018",
+      radius: 9,
+      wingTint: "rgba(230, 210, 180, 0.5)",
+      eyes: "#f5f5f5",
+    });
+    ctx.restore();
+    super.draw(ctx, layout);
+  }
+}
+
 export function createEnemy(type, x, y) {
   switch (type) {
     case "horf":
@@ -343,9 +563,21 @@ export function createEnemy(type, x, y) {
       return new Gaper(x, y);
     case "dip":
       return new Dip(x, y);
+    case "fly":
+      return new Fly(x, y);
+    case "attack_fly":
+      return new AttackFly(x, y);
+    case "pooter_fly":
+      return new PooterFly(x, y);
+    case "corn_fly":
+      return new PooterFly(x, y);
     default:
       return new Gaper(x, y);
   }
+}
+
+export function hasCombatEnemies(enemies = []) {
+  return enemies.some((e) => e.alive && !e.harmless);
 }
 
 export function checkEnemyContact(player, enemies) {
@@ -354,6 +586,7 @@ export function checkEnemyContact(player, enemies) {
 
   for (const enemy of enemies) {
     if (!enemy.alive) continue;
+    if (enemy.harmless) continue;
     if (Math.hypot(chest.x - enemy.x, chest.y - enemy.y) < pr + enemy.radius) {
       return enemy;
     }

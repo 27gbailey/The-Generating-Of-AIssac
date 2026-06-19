@@ -1,5 +1,4 @@
 import {
-  BLOCKING_TILES,
   DOOR_CLEARANCE,
   DOOR_WALLS,
   ROOM_HEIGHT,
@@ -8,6 +7,11 @@ import {
   ITEM_ROOM_PRESET,
   SECRET_PRESET_POOL,
 } from "./constants.js";
+import {
+  getBlockedWalls,
+  presetSupportsDoors,
+  wallsConflictWithNeighbors,
+} from "./roomValidation.js";
 import { createEmptyGrid, decodeRoomId, encodeRoomId } from "./roomId.js";
 import { applyRoomObjectVariants } from "./roomVariants.js";
 import { getActiveBossDefinition, getBossPresetIds, getBossRoomLayouts } from "./boss.js";
@@ -28,6 +32,16 @@ function normalizePickups(raw = []) {
   });
 }
 
+function normalizeEnemySpawns(raw = []) {
+  return raw.map((entry) => {
+    if (Array.isArray(entry)) {
+      const [type, x, y] = entry;
+      return { type, x, y };
+    }
+    return entry;
+  });
+}
+
 function buildLayout({
   rocks = [],
   poops = [],
@@ -37,6 +51,7 @@ function buildLayout({
   redCampfires = [],
   keepers = [],
   pickups = [],
+  enemies = [],
   skipPerimeter = false,
   perimeter = "normal",
 } = {}) {
@@ -49,7 +64,11 @@ function buildLayout({
   for (const [x, y] of redCampfires) place(grid, x, y, TILE.RED_CAMPFIRE);
   for (const [x, y] of keepers) place(grid, x, y, TILE.KEEPER);
   if (!skipPerimeter) applyPerimeterRing(grid, perimeter);
-  return { grid, pickups: normalizePickups(pickups) };
+  return {
+    grid,
+    pickups: normalizePickups(pickups),
+    enemySpawns: normalizeEnemySpawns(enemies),
+  };
 }
 
 const DOOR_TILES = new Set(
@@ -344,21 +363,25 @@ const PRESET_LAYOUTS = {
     rocks: [[4, 0], [4, 1], [4, 2], [4, 3], [4, 4], [4, 5], [4, 6]],
     poops: [[4, 3]],
     barrels: [[9, 3]],
+    enemies: [["attack_fly", 8, 2], ["attack_fly", 9, 4], ["pooter_fly", 7, 3]],
   },
   east_sealed_wing: {
     rocks: [[8, 0], [8, 1], [8, 2], [8, 3], [8, 4], [8, 5], [8, 6]],
     poops: [[8, 3]],
     campfires: [[2, 3]],
+    enemies: [["pooter_fly", 3, 2], ["pooter_fly", 3, 4], ["fly", 2, 3]],
   },
   north_blocked_half: {
     rocks: [[0, 3], [1, 3], [2, 3], [3, 3], [4, 3], [5, 3], [6, 3], [7, 3], [8, 3], [9, 3], [10, 3], [11, 3], [12, 3]],
     poops: [[6, 2]],
     barrels: [[6, 5]],
+    enemies: [["horf", 6, 1], ["fly", 3, 1], ["fly", 9, 1]],
   },
   south_blocked_half: {
-    rocks: [[0, 4], [1, 4], [2, 4], [3, 4], [4, 4], [5, 4], [6, 4], [7, 4], [8, 4], [9, 4], [10, 4], [11, 4], [12, 4]],
+    rocks: [[0, 4], [1, 4], [2, 4], [3, 4], [4, 4], [5, 4], [7, 4], [8, 4], [9, 4], [10, 4], [11, 4], [12, 4]],
     campfires: [[3, 2], [9, 2]],
-    poops: [[6, 5]],
+    poops: [[6, 4]],
+    enemies: [["pooter_fly", 6, 5], ["attack_fly", 3, 5], ["attack_fly", 9, 5]],
   },
   vertical_split: {
     rocks: [[6, 0], [6, 1], [6, 2], [6, 4], [6, 5], [6, 6]],
@@ -450,6 +473,7 @@ const PRESET_LAYOUTS = {
     rocks: [[5, 2], [7, 2]],
     poops: [[6, 3]],
     barrels: [[6, 4]],
+    enemies: [["horf", 6, 1], ["gaper", 4, 5], ["gaper", 8, 5]],
   },
   west_cache: {
     rocks: [[3, 2], [3, 3], [3, 4]],
@@ -508,12 +532,13 @@ const PRESET_LAYOUTS = {
     campfires: [[6, 3]],
   },
   red_scatter_mixed: {
-    redCampfires: [[0, 2], [12, 4], [3, 6]],
-    campfires: [[6, 3], [9, 0]],
+    redCampfires: [[1, 2], [11, 4], [3, 6]],
+    campfires: [[6, 3], [9, 1]],
   },
   red_flank_guards: {
-    redCampfires: [[0, 3], [12, 3]],
-    campfires: [[6, 0], [6, 6]],
+    redCampfires: [[2, 3], [10, 3]],
+    campfires: [[6, 1], [6, 5]],
+    enemies: [["attack_fly", 6, 3], ["attack_fly", 4, 2], ["attack_fly", 8, 4]],
   },
   red_hell_hearth: {
     redCampfires: [[5, 2], [7, 2], [6, 3], [5, 4], [7, 4]],
@@ -583,7 +608,7 @@ export const ROOM_PRESET_POOL = Object.keys(LAYOUT_BUILDERS).filter(
 
 export const ROOM_PRESETS = Object.fromEntries(
   Object.entries(LAYOUT_BUILDERS).map(([id, buildLayoutFn]) => {
-    const { grid, pickups } = buildLayoutFn();
+    const { grid, pickups, enemySpawns } = buildLayoutFn();
     return [
       id,
       {
@@ -601,6 +626,7 @@ export const ROOM_PRESETS = Object.fromEntries(
         isSecretRoom: SECRET_PRESET_POOL.includes(id),
         buildGrid: buildLayoutFn,
         presetPickups: pickups,
+        presetEnemySpawns: enemySpawns,
         baseRoomId: encodeRoomId(grid, {
           north: false,
           east: false,
@@ -619,26 +645,7 @@ function formatPresetName(id) {
     .join(" ");
 }
 
-export function getBlockedWalls(grid) {
-  const blocked = { north: false, east: false, south: false, west: false };
-  for (const wall of DOOR_WALLS) {
-    for (const tile of DOOR_CLEARANCE[wall]) {
-      const code = grid[tile.y][tile.x];
-      if (BLOCKING_TILES.has(code)) {
-        blocked[wall] = true;
-        break;
-      }
-    }
-  }
-  return blocked;
-}
-
-export function wallsConflictWithNeighbors(blocked, neighborWalls) {
-  for (const wall of neighborWalls) {
-    if (blocked[wall]) return true;
-  }
-  return false;
-}
+export { getBlockedWalls, wallsConflictWithNeighbors } from "./roomValidation.js";
 
 export function pickPresetForCell(rand, requiredWalls, excludeBoss = true) {
   const roll = rand();
@@ -657,16 +664,13 @@ export function pickPresetForCell(rand, requiredWalls, excludeBoss = true) {
 
   const pool = group.filter((id) => {
     if (!ROOM_PRESETS[id]) return false;
-    const { grid } = ROOM_PRESETS[id].buildGrid();
-    const blocked = getBlockedWalls(grid);
-    return !wallsConflictWithNeighbors(blocked, requiredWalls);
+    return presetSupportsDoors(ROOM_PRESETS[id].buildGrid, requiredWalls);
   });
 
   if (pool.length === 0) {
     const fallback = PRESET_GROUPS.minimal.filter((id) => {
       if (!ROOM_PRESETS[id]) return false;
-      const { grid } = ROOM_PRESETS[id].buildGrid();
-      return !wallsConflictWithNeighbors(getBlockedWalls(grid), requiredWalls);
+      return presetSupportsDoors(ROOM_PRESETS[id].buildGrid, requiredWalls);
     });
     if (fallback.length) return fallback[Math.floor(rand() * fallback.length)];
     return "empty";
@@ -726,6 +730,13 @@ const PRESET_GROUPS = {
   ],
 };
 
+export function getPresetGroup(presetId) {
+  for (const [group, ids] of Object.entries(PRESET_GROUPS)) {
+    if (ids.includes(presetId)) return group;
+  }
+  return "minimal";
+}
+
 export const PUZZLE_PRESET_IDS = new Set([
   ...PRESET_GROUPS.puzzle,
   ...PRESET_GROUPS.loot,
@@ -747,7 +758,7 @@ export function buildRoomFromPreset(presetId, doors, rand = null) {
     throw new Error(`Unknown room preset "${presetId}".`);
   }
 
-  const { grid, pickups } = preset.buildGrid();
+  const { grid, pickups, enemySpawns } = preset.buildGrid();
   if (rand) applyRoomObjectVariants({ grid }, rand);
   const roomId = encodeRoomId(grid, doors);
   const room = decodeRoomId(roomId);
@@ -757,6 +768,7 @@ export function buildRoomFromPreset(presetId, doors, rand = null) {
     isBoss: preset.isBoss,
     blockedWalls: getBlockedWalls(room.grid),
     presetPickups: pickups,
+    presetEnemySpawns: enemySpawns,
     poopStates: null,
     destroyedRocks: null,
     destroyedPots: null,

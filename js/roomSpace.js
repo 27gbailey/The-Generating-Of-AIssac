@@ -105,8 +105,9 @@ export function circleHitsBoundary(cx, cy, radius, room) {
   return false;
 }
 
-export function circleHitsRoom(cx, cy, radius, room) {
+export function circleHitsRoom(cx, cy, radius, room, { flying = false } = {}) {
   if (circleHitsBoundary(cx, cy, radius, room)) return true;
+  if (flying) return false;
 
   const { width, height } = getPlayAreaSize();
   const minTx = Math.max(0, Math.floor((cx - radius) / TILE_SIZE));

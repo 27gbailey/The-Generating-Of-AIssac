@@ -11,6 +11,10 @@ import {
   getBlockedWalls,
   pickPresetForCell,
 } from "./rooms.js";
+import {
+  bothSidesBlockSharedWall,
+  presetSupportsDoors,
+} from "./roomValidation.js";
 import { getPlayAreaSize } from "./roomSpace.js";
 import { isInDoorGap } from "./doors.js";
 import { isDoorPassable } from "./doorLock.js";
@@ -195,23 +199,69 @@ function computeDoors(cell, cells, presetId) {
 }
 
 function ensureMinimumConnectivity(cells, rand) {
-  for (const cell of Object.values(cells)) {
-    if (cell.isSecret || cell.isItemRoom) continue;
-    const intended = intendedNeighbors(cells, cell.gx, cell.gy);
-    const needed = requiredOpenWalls(intended);
-    if (needed.length === 0) continue;
+  for (let pass = 0; pass < 12; pass++) {
+    let changed = false;
 
-    let doors = computeDoors(cell, cells, cell.presetId);
-    if (DOOR_WALLS.some((wall) => doors[wall])) continue;
+    for (const cell of Object.values(cells)) {
+      if (cell.isSecret || cell.isItemRoom) continue;
 
-    if (cell.isStart || cell.isBoss) continue;
+      const intended = intendedNeighbors(cells, cell.gx, cell.gy);
+      const needed = requiredOpenWalls(intended);
 
-    cell.presetId = pickPresetForCell(rand, needed);
-    doors = computeDoors(cell, cells, cell.presetId);
+      if (
+        needed.length > 0 &&
+        !cell.isStart &&
+        !cell.isBoss &&
+        !presetSupportsDoors(
+          () => ({ grid: presetGrid(cell.presetId ?? "empty") }),
+          needed
+        )
+      ) {
+        cell.presetId = pickPresetForCell(rand, needed);
+        changed = true;
+      }
 
-    if (!DOOR_WALLS.some((wall) => doors[wall])) {
-      cell.presetId = "empty";
+      for (const wall of DOOR_WALLS) {
+        const { dx, dy } = DIRECTIONS[wall];
+        const neighbor = cells[`${cell.gx + dx},${cell.gy + dy}`];
+        if (!neighbor || neighbor.isSecret || neighbor.isItemRoom || neighbor.isBoss) continue;
+
+        if (
+          bothSidesBlockSharedWall(
+            presetGrid(cell.presetId ?? "empty"),
+            presetGrid(neighbor.presetId ?? "empty"),
+            wall
+          )
+        ) {
+          const neighborNeeded = requiredOpenWalls(
+            intendedNeighbors(cells, neighbor.gx, neighbor.gy)
+          );
+          neighbor.presetId = pickPresetForCell(rand, neighborNeeded);
+          changed = true;
+        }
+      }
     }
+
+    for (const cell of Object.values(cells)) {
+      if (cell.isSecret || cell.isItemRoom) continue;
+      const intended = intendedNeighbors(cells, cell.gx, cell.gy);
+      const needed = requiredOpenWalls(intended);
+      if (needed.length === 0) continue;
+
+      const doors = computeDoors(cell, cells, cell.presetId);
+      if (DOOR_WALLS.some((wall) => doors[wall])) continue;
+      if (cell.isStart || cell.isBoss) continue;
+
+      cell.presetId = pickPresetForCell(rand, needed);
+      changed = true;
+
+      const retryDoors = computeDoors(cell, cells, cell.presetId);
+      if (!DOOR_WALLS.some((wall) => retryDoors[wall])) {
+        cell.presetId = "empty";
+      }
+    }
+
+    if (!changed) break;
   }
 }
 

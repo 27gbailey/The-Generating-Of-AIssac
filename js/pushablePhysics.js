@@ -65,17 +65,21 @@ function hitsEntities(x, y, radius, entities, skip) {
   return false;
 }
 
+function hitsRoomForEntity(x, y, radius, room, entity) {
+  return circleHitsRoom(x, y, radius, room, { flying: entity.flying === true });
+}
+
 export function moveCircle(entity, dt, room, entities, friction) {
   const stepDt = dt / 2;
   for (let i = 0; i < 2; i++) {
     const nx = entity.x + entity.vx * stepDt;
-    if (!circleHitsRoom(nx, entity.y, entity.radius, room) && !hitsEntities(nx, entity.y, entity.radius, entities, entity)) {
+    if (!hitsRoomForEntity(nx, entity.y, entity.radius, room, entity) && !hitsEntities(nx, entity.y, entity.radius, entities, entity)) {
       entity.x = nx;
     } else {
       entity.vx *= -0.2;
     }
     const ny = entity.y + entity.vy * stepDt;
-    if (!circleHitsRoom(entity.x, ny, entity.radius, room) && !hitsEntities(entity.x, ny, entity.radius, entities, entity)) {
+    if (!hitsRoomForEntity(entity.x, ny, entity.radius, room, entity) && !hitsEntities(entity.x, ny, entity.radius, entities, entity)) {
       entity.y = ny;
     } else {
       entity.vy *= -0.2;

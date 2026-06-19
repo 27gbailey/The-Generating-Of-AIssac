@@ -67,6 +67,9 @@ export const ENEMY_CONTACT_DAMAGE = 1;
 export const HORF_HP = 20;
 export const GAPER_HP = 20;
 export const DIP_HP = 10;
+export const FLY_HP = 10;
+export const ATTACK_FLY_HP = 10;
+export const POOTER_FLY_HP = 10;
 
 export const PICKUP_PENNY_RADIUS = 12;
 export const PICKUP_KEY_RADIUS = 13;

@@ -4,6 +4,7 @@ export {
   ROOM_PRESETS,
   buildRoomFromPreset,
   getBlockedWalls,
+  getPresetGroup,
   getRoomCatalogEntry,
   listAllPresetIds,
   isPuzzlePreset,
