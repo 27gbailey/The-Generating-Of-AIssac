@@ -131,6 +131,11 @@ export function circleHitsRoom(cx, cy, radius, room, { flying = false } = {}) {
     }
   }
 
+  if (room.pedestal?.active) {
+    const p = room.pedestal;
+    if (Math.hypot(cx - p.x, cy - p.y) < radius + p.hitRadius) return true;
+  }
+
   return false;
 }
 

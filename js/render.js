@@ -164,8 +164,8 @@ function drawDoor(
 
   if (boss) {
     const openGlow = !locked;
+    const pulse = openGlow ? 0.55 + Math.sin(time * 3.2) * 0.25 : 0;
     if (openGlow) {
-      const pulse = 0.55 + Math.sin(time * 3.2) * 0.25;
       ctx.save();
       ctx.shadowColor = "#cc2020";
       ctx.shadowBlur = 14 + Math.sin(time * 4) * 6;

@@ -1,8 +1,9 @@
 import { circleHitsRoom } from "./roomSpace.js";
 import { getBodyVector, getHeadVector } from "./input.js";
-import { spawnTear } from "./tear.js";
+import { spawnTears } from "./tear.js";
 import { createPlayerStats } from "./stats.js";
 import { damage } from "./stats.js";
+import { computeTearModifiers } from "./items.js";
 import { INVINCIBILITY_DURATION, BODY_RADIUS, CHEST_OFFSET_Y } from "./constants.js";
 
 const DEFAULT_BODY = { x: 0, y: 1 };
@@ -28,6 +29,7 @@ export class AIsaac {
     this.isWalking = false;
     this.shootCooldown = 0;
     this.shootRate = 0.32;
+    this.items = [];
     this.stats = createPlayerStats();
     this.invincibleTime = 0;
     this.deathState = null;
@@ -156,6 +158,7 @@ export class AIsaac {
     this.vx = 0;
     this.vy = 0;
     this.stats = createPlayerStats();
+    this.items = [];
     this.invincibleTime = 0;
     this.deathState = null;
     this.bodyDir = { ...DEFAULT_BODY };
@@ -164,11 +167,24 @@ export class AIsaac {
     this.shootCooldown = 0;
   }
 
+  getTearModifiers() {
+    return computeTearModifiers(this.items);
+  }
+
+  addItem(itemId) {
+    if (!itemId) return false;
+    this.items.push(itemId);
+    const mods = this.getTearModifiers();
+    this.shootRate = mods.shootRate;
+    return true;
+  }
+
   tryShoot() {
     if (this.shootCooldown > 0 || this.isDying) return null;
-    this.shootCooldown = this.shootRate;
+    const mods = this.getTearModifiers();
+    this.shootCooldown = mods.shootRate ?? this.shootRate;
     const head = this.headPosition();
-    return spawnTear(this, this.headDir, head);
+    return spawnTears(this, this.headDir, head);
   }
 
   draw(ctx, layout, screenOverride = null) {

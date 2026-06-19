@@ -202,3 +202,75 @@ body {
   box-shadow: inset 0 1px 0 rgba(255, 180, 180, 0.35);
   transition: width 0.12s linear;
 }
+
+.item-pickup-banner {
+  position: absolute;
+  top: 118px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 22px 14px;
+  background: rgba(8, 6, 4, 0.88);
+  border: 1px solid rgba(220, 190, 120, 0.35);
+  border-radius: 10px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+  text-align: center;
+  min-width: min(360px, 80vw);
+}
+
+.item-pickup-banner.hidden {
+  display: none;
+}
+
+.item-pickup-name {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #f0e6c8;
+}
+
+.item-pickup-flavor {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(220, 200, 160, 0.82);
+}
+
+.item-bar {
+  position: absolute;
+  right: 12px;
+  top: 170px;
+  display: grid;
+  grid-template-columns: repeat(3, 40px);
+  gap: 6px;
+  padding: 8px;
+  background: rgba(8, 6, 4, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.item-bar.empty {
+  display: none;
+}
+
+.item-slot {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+}
+
+.item-slot-canvas {
+  display: block;
+  width: 40px;
+  height: 40px;
+}

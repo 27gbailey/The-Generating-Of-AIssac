@@ -18,7 +18,16 @@ import {
   revealSecretEntrance,
 } from "./dungeon.js";
 import { drawMinimap } from "./minimap.js";
-import { initStatsHud, updateRoomHud, updateStatsHud } from "./hud.js";
+import {
+  initStatsHud,
+  initItemHud,
+  updateRoomHud,
+  updateStatsHud,
+  updateItemBar,
+  showItemPickup,
+  tickItemPickupBanner,
+} from "./hud.js";
+import { getItem } from "./items.js";
 import { collectPushableEntities, moveCircle, resolveCircleCollisions } from "./pushablePhysics.js";
 import { checkCampfireBurn, checkCampfireBurnEnemies, updateRedCampfires } from "./campfire.js";
 import { CAMPFIRE_DAMAGE, EXPLOSION_DAMAGE } from "./constants.js";
@@ -61,6 +70,11 @@ function syncRoomEntities(cell) {
   game.enemies = cell?.enemies ?? [];
   game.boss = cell?.boss ?? null;
   game.trapdoor = cell?.trapdoor ?? null;
+  game.pedestal = cell?.pedestal ?? null;
+  if (game.room) {
+    game.room.pedestal =
+      cell?.pedestal?.active && !cell.pedestal.itemTaken ? cell.pedestal : null;
+  }
   if (cell?.floorSmears && game.room) {
     game.room.floorSmears = cell.floorSmears;
   }
@@ -73,6 +87,7 @@ function persistRoomEntities(cell) {
   cell.enemies = game.enemies;
   cell.boss = game.boss;
   cell.trapdoor = game.trapdoor;
+  cell.pedestal = game.pedestal;
 }
 
 function updateChestsAndPickups(dt) {
@@ -106,6 +121,24 @@ function updateChestsAndPickups(dt) {
 
   game.pickups = game.pickups.filter((p) => !p.dead);
   if (statsChanged) updateStatsHud(game.player.stats);
+}
+
+function updatePedestal(dt) {
+  const pedestal = game.pedestal;
+  if (!pedestal?.active) return;
+
+  const itemId = pedestal.update(dt, game.player);
+  if (!itemId) return;
+
+  const cell = currentCell();
+  game.player.addItem(itemId);
+  if (game.room) game.room.pedestal = null;
+  if (cell) cell.pedestal = pedestal;
+
+  const item = getItem(itemId);
+  if (item) showItemPickup(item);
+  updateItemBar(game.player.items);
+  sfx.pickup();
 }
 
 const canvas = document.getElementById("game");
@@ -174,6 +207,7 @@ function regenerateFloor() {
 
 function completeFloorDescent() {
   const stats = game.player.stats;
+  const items = [...game.player.items];
   const floorNumber = (game.floorNumber ?? 1) + 1;
   const dungeon = generateDungeon(Date.now() + floorNumber * 99991, floorNumber);
   const start = getCurrentRoomData(dungeon, dungeon.start.gx, dungeon.start.gy);
@@ -198,8 +232,11 @@ function completeFloorDescent() {
   syncRoomDoorLock(start.room, start);
   game.player.resetAt(spawn.x, spawn.y);
   game.player.stats = stats;
+  game.player.items = items;
+  game.player.shootRate = game.player.getTearModifiers().shootRate;
   hideBossHud();
   updateHud();
+  updateItemBar(game.player.items);
 }
 
 function boot() {
@@ -227,6 +264,7 @@ function boot() {
     enemies: start.enemies ?? [],
     boss: start.boss ?? null,
     trapdoor: start.trapdoor ?? null,
+    pedestal: start.pedestal ?? null,
     cinematic: null,
     bombCooldown: 0,
     roomTransition: null,
@@ -234,6 +272,10 @@ function boot() {
   };
 
   syncRoomDoorLock(start.room, start);
+  if (game.room) {
+    game.room.pedestal =
+      start.pedestal?.active && !start.pedestal.itemTaken ? start.pedestal : null;
+  }
   updateHud();
 }
 
@@ -253,6 +295,7 @@ function updateHud() {
     gy: game.gy,
   });
   updateStatsHud(game.player.stats);
+  updateItemBar(game.player.items);
 }
 
 function roomDrawOptions(gx, gy) {
@@ -497,9 +540,9 @@ function update(dt) {
 
   tryPlaceBombFromInput();
 
-  const tear = game.player.update(dt, input.keys, game.room);
-  if (tear) {
-    game.tears.push(tear);
+  const tears = game.player.update(dt, input.keys, game.room);
+  if (tears?.length) {
+    game.tears.push(...tears);
     sfx.shoot();
   }
 
@@ -544,6 +587,8 @@ function update(dt) {
 
   updateBombs(dt);
   updateChestsAndPickups(dt);
+  updatePedestal(dt);
+  tickItemPickupBanner(dt);
 
   const transition = checkDoorTransition(
     game.player,
@@ -561,7 +606,7 @@ function update(dt) {
   }
 
   for (const t of game.tears) {
-    const burstPos = t.update(dt, game.room, game.enemies, game.boss);
+    const burstPos = t.update(dt, game.room, game.enemies, game.boss, game.player);
     if (burstPos) {
       if (burstPos.enemy) {
         game.bursts.push(new TearBurst(burstPos.x, burstPos.y));
@@ -728,6 +773,8 @@ function updateEnemies(dt) {
 function drawWorldContents(layout, bombs = game.bombs, screenOverride = null) {
   if (game.chest) game.chest.draw(ctx, layout);
 
+  if (game.pedestal) game.pedestal.draw(ctx, layout);
+
   for (const pickup of game.pickups) {
     pickup.draw(ctx, layout);
   }
@@ -843,6 +890,7 @@ window.addEventListener("resize", resize);
 try {
   resize();
   initStatsHud();
+  initItemHud();
   initBossHud();
   boot();
   requestAnimationFrame(loop);

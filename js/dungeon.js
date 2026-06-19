@@ -23,6 +23,7 @@ import { initDestroyedRocks } from "./destructibles.js";
 import { initBarrelStates } from "./barrel.js";
 import { initCampfireStates } from "./campfire.js";
 import { spawnChestsInDungeon, spawnSecretRoomChests } from "./chestSpawner.js";
+import { spawnItemRoomPedestals } from "./itemSpawner.js";
 import { createPickupsFromLayout } from "./pickup.js";
 import { spawnEnemiesInDungeon } from "./enemySpawner.js";
 import { createBrokenDoors, syncRoomDoorLock } from "./doorLock.js";
@@ -662,6 +663,7 @@ export function generateDungeon(seed = Date.now(), floorNumber = 1) {
 
   spawnChestsInDungeon(dungeon, rand);
   spawnSecretRoomChests(dungeon, rand);
+  spawnItemRoomPedestals(dungeon, rand);
   spawnEnemiesInDungeon(dungeon, rand);
 
   for (const cell of Object.values(dungeon.rooms)) {
