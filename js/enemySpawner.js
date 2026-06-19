@@ -224,7 +224,7 @@ export function spawnEnemiesInDungeon(dungeon, rand) {
     cell.enemies = spawnEnemiesForCell(cell, cell.room, rand);
     cell.doorsLocked = false;
     cell.brokenDoors = { north: false, east: false, south: false, west: false };
-    cell.hadCombatEnemies = cell.enemies.some((enemy) => !enemy.harmless);
+    cell.hadCombatEnemies = cell.enemies.length > 0;
     cell.clearRewardDropped = false;
   }
 }

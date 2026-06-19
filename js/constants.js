@@ -57,6 +57,9 @@ export const START_BOMBS = 1;
 export const BARREL_HITS_TO_DESTROY = 3;
 
 export const CAMPFIRE_HITS_TO_EXTINGUISH = 8;
+export const CAMPFIRE_ENEMY_DAMAGE = 2;
+export const CAMPFIRE_ENEMY_TICK = 0.18;
+/** Player damage per frame while standing in campfire flames. */
 export const CAMPFIRE_DAMAGE = 1;
 /** Burn hitbox covers nearly the full tile (visual flame is larger). */
 export const CAMPFIRE_FIRE_RADIUS = TILE_SIZE / 2 - 2;

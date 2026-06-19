@@ -1,4 +1,6 @@
 import {
+  CAMPFIRE_ENEMY_DAMAGE,
+  CAMPFIRE_ENEMY_TICK,
   CAMPFIRE_HITS_TO_EXTINGUISH,
   ROOM_HEIGHT,
   ROOM_WIDTH,
@@ -122,23 +124,44 @@ function circleIntersectsCampfireTile(cx, cy, radius, tx, ty) {
   return dx * dx + dy * dy < radius * radius;
 }
 
-export function checkCampfireBurn(player, room) {
-  const chest = player.chestPosition?.() ?? { x: player.x, y: player.y };
-  const r = player.bodyRadius ?? player.radius;
-  const minTx = Math.max(0, Math.floor((chest.x - r - TILE_SIZE) / TILE_SIZE));
-  const maxTx = Math.min(ROOM_WIDTH - 1, Math.floor((chest.x + r + TILE_SIZE) / TILE_SIZE));
-  const minTy = Math.max(0, Math.floor((chest.y - r - TILE_SIZE) / TILE_SIZE));
-  const maxTy = Math.min(ROOM_HEIGHT - 1, Math.floor((chest.y + r + TILE_SIZE) / TILE_SIZE));
+export function checkCampfireBurnAt(x, y, radius, room) {
+  const minTx = Math.max(0, Math.floor((x - radius - TILE_SIZE) / TILE_SIZE));
+  const maxTx = Math.min(ROOM_WIDTH - 1, Math.floor((x + radius + TILE_SIZE) / TILE_SIZE));
+  const minTy = Math.max(0, Math.floor((y - radius - TILE_SIZE) / TILE_SIZE));
+  const maxTy = Math.min(ROOM_HEIGHT - 1, Math.floor((y + radius + TILE_SIZE) / TILE_SIZE));
 
   for (let ty = minTy; ty <= maxTy; ty++) {
     for (let tx = minTx; tx <= maxTx; tx++) {
       if (!isCampfireBurning(room, tx, ty)) continue;
-      if (circleIntersectsCampfireTile(chest.x, chest.y, r, tx, ty)) {
+      if (circleIntersectsCampfireTile(x, y, radius, tx, ty)) {
         return true;
       }
     }
   }
   return false;
+}
+
+export function checkCampfireBurn(player, room) {
+  const chest = player.chestPosition?.() ?? { x: player.x, y: player.y };
+  const r = player.bodyRadius ?? player.radius;
+  return checkCampfireBurnAt(chest.x, chest.y, r, room);
+}
+
+export function checkCampfireBurnEnemies(enemies, room, dt) {
+  if (!enemies?.length) return;
+
+  for (const enemy of enemies) {
+    if (!enemy.alive) continue;
+    if (!checkCampfireBurnAt(enemy.x, enemy.y, enemy.radius, room)) {
+      enemy.campfireBurnTimer = 0;
+      continue;
+    }
+
+    enemy.campfireBurnTimer = (enemy.campfireBurnTimer ?? 0) - dt;
+    if (enemy.campfireBurnTimer > 0) continue;
+    enemy.campfireBurnTimer = CAMPFIRE_ENEMY_TICK;
+    enemy.takeDamage(CAMPFIRE_ENEMY_DAMAGE);
+  }
 }
 
 export function updateRedCampfires(room, dt, player, rand) {

@@ -1,5 +1,5 @@
 import { DOOR_WALLS, DOOR_BREAK_RADIUS_SCALE, ROOM_HEIGHT, ROOM_WIDTH, TILE_SIZE } from "./constants.js";
-import { hasCombatEnemies } from "./enemies.js";
+import { hasAliveEnemies } from "./enemies.js";
 import { DOOR_SPAN } from "./doors.js";
 import { pointInExplosion } from "./explosion.js";
 
@@ -130,20 +130,20 @@ export function refreshDoorLockState(cell, room) {
   if (!cell || !room) return { justCleared: false };
 
   const wasLocked = cell.doorsLocked;
-  const aliveCombat = hasCombatEnemies(cell.enemies);
+  const aliveEnemies = hasAliveEnemies(cell.enemies);
   const aliveBoss = cell.boss?.alive ?? false;
 
-  cell.doorsLocked = aliveCombat || aliveBoss;
+  cell.doorsLocked = aliveEnemies || aliveBoss;
   syncRoomDoorLock(room, cell);
 
   const justCleared =
-    wasLocked && cell.hadCombatEnemies && !aliveCombat && !cell.clearRewardDropped;
+    wasLocked && cell.hadCombatEnemies && !aliveEnemies && !cell.clearRewardDropped;
 
   return { justCleared };
 }
 
 export function lockDoorsForEnemies(cell, room) {
-  const hasEnemies = hasCombatEnemies(cell?.enemies);
+  const hasEnemies = hasAliveEnemies(cell?.enemies);
   const hasBoss = cell?.boss?.alive;
   if (!hasEnemies && !hasBoss) return;
   cell.doorsLocked = true;
@@ -152,7 +152,7 @@ export function lockDoorsForEnemies(cell, room) {
 }
 
 export function countAliveEnemies(enemies = []) {
-  return enemies.filter((e) => e.alive && !e.harmless).length;
+  return enemies.filter((e) => e.alive).length;
 }
 
 export function explosionHitsSecretWall(cell, cx, cy, radiusX, radiusY) {

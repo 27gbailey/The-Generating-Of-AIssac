@@ -18,8 +18,8 @@ import {
 } from "./dungeon.js";
 import { drawMinimap } from "./minimap.js";
 import { initStatsHud, updateRoomHud, updateStatsHud } from "./hud.js";
-import { collectPushableEntities } from "./pushablePhysics.js";
-import { checkCampfireBurn, updateRedCampfires } from "./campfire.js";
+import { collectPushableEntities, moveCircle, resolveCircleCollisions } from "./pushablePhysics.js";
+import { checkCampfireBurn, checkCampfireBurnEnemies, updateRedCampfires } from "./campfire.js";
 import { CAMPFIRE_DAMAGE, EXPLOSION_DAMAGE } from "./constants.js";
 import { sfx } from "./audio.js";
 import {
@@ -506,6 +506,8 @@ function update(dt) {
   }
 
   updateEnemies(dt);
+  checkCampfireBurnEnemies(game.enemies, game.room, dt);
+  handleRoomClear(currentCell());
   updateBoss(dt);
   applyBossPushPhysics(game.boss, dt);
   updateTrapdoor(dt);

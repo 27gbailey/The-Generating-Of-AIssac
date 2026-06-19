@@ -275,6 +275,8 @@ export class Dip extends Enemy {
   constructor(x, y) {
     super("dip", x, y, DIP_HP);
     this.radius = 9;
+    this.hitRadius = 13;
+    this.hitHeightStretch = 1.35;
     this.phase = "pause";
     this.phaseTimer = Math.random() * DIP_PAUSE_TIME;
     this.vx = 0;
@@ -388,6 +390,8 @@ export class Fly extends Enemy {
     this.flying = true;
     this.harmless = true;
     this.radius = 9;
+    this.hitRadius = 14;
+    this.hitHeightStretch = 1.45;
     this.wanderTimer = Math.random() * 2;
     this.wanderDirX = 0;
     this.wanderDirY = 0;
@@ -437,6 +441,8 @@ export class AttackFly extends Enemy {
     super("attack_fly", x, y, ATTACK_FLY_HP);
     this.flying = true;
     this.radius = 10;
+    this.hitRadius = 14;
+    this.hitHeightStretch = 1.45;
     this.wingPhase = Math.random() * Math.PI * 2;
   }
 
@@ -483,6 +489,8 @@ export class PooterFly extends Enemy {
     super("pooter_fly", x, y, POOTER_FLY_HP);
     this.flying = true;
     this.radius = 10;
+    this.hitRadius = 14;
+    this.hitHeightStretch = 1.45;
     this.wingPhase = Math.random() * Math.PI * 2;
     this.wanderTimer = Math.random() * 2;
     this.wanderDirX = 0;
@@ -576,8 +584,8 @@ export function createEnemy(type, x, y) {
   }
 }
 
-export function hasCombatEnemies(enemies = []) {
-  return enemies.some((e) => e.alive && !e.harmless);
+export function hasAliveEnemies(enemies = []) {
+  return enemies.some((e) => e.alive);
 }
 
 export function checkEnemyContact(player, enemies) {
@@ -614,7 +622,12 @@ export function damageEnemiesInExplosion(enemies, cx, cy, radiusX, radiusY, dama
 export function findEnemyHit(cx, cy, radius, enemies) {
   for (const enemy of enemies) {
     if (!enemy.alive) continue;
-    if (Math.hypot(cx - enemy.x, cy - enemy.y) < radius + enemy.radius) {
+    const hitRadius = enemy.hitRadius ?? enemy.radius;
+    const hitY = enemy.y + (enemy.hitYOffset ?? 0);
+    const stretch = enemy.hitHeightStretch ?? 1;
+    const dx = cx - enemy.x;
+    const dy = (cy - hitY) / stretch;
+    if (Math.hypot(dx, dy) < radius + hitRadius) {
       return enemy;
     }
   }
