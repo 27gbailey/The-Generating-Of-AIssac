@@ -51,6 +51,7 @@ function isSolidTile(code, room, tx, ty) {
   if (code === TILE.POT) return isPotSolid(room, tx, ty);
   if (code === TILE.POOP) return isPoopSolid(room, tx, ty);
   if (code === TILE.BARREL) return isBarrelSolid(room, tx, ty);
+  if (code === TILE.KEEPER) return isKeeperSolid(room, tx, ty);
   return false;
 }
 
@@ -131,9 +132,10 @@ export function circleHitsRoom(cx, cy, radius, room, { flying = false, keyCount 
     }
   }
 
-  if (room.pedestal?.active) {
+  if (room.pedestal?.active && !room.pedestal.itemTaken) {
     const p = room.pedestal;
-    if (Math.hypot(cx - p.x, cy - p.y) < radius + p.hitRadius) return true;
+    const blockR = p.collisionRadius ?? 14;
+    if (Math.hypot(cx - p.x, cy - p.y) <= radius + blockR) return true;
   }
 
   return false;

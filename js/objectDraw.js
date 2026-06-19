@@ -54,41 +54,41 @@ export function drawRock3D(ctx, px, py) {
   ctx.restore();
 }
 
-/** Cyan-tinted rock with a subtle etched X — only breakable by bombs. */
+/** Slightly blue-tinted rock with a faint etched X — only breakable by bombs. */
 export function drawBlueRock3D(ctx, px, py) {
   drawTileShadow(ctx, px, py, 0.95);
 
   ctx.save();
   traceRockVisual(ctx, px, py);
-  ctx.fillStyle = "#5a7a82";
+  ctx.fillStyle = "#686e72";
   ctx.fill();
 
   const { cx, cy, rx } = traceRockVisual(ctx, px, py);
   const grad = ctx.createLinearGradient(cx - rx, cy - rx, cx + rx, cy + rx);
-  grad.addColorStop(0, "#7aa8b0");
-  grad.addColorStop(0.45, "#5d8a92");
-  grad.addColorStop(1, "#3a5860");
+  grad.addColorStop(0, "#8a9094");
+  grad.addColorStop(0.45, "#72787c");
+  grad.addColorStop(1, "#545a5e");
   traceRockVisual(ctx, px, py);
   ctx.fillStyle = grad;
   ctx.fill();
 
-  ctx.fillStyle = "rgba(180, 240, 255, 0.16)";
+  ctx.fillStyle = "rgba(200, 220, 228, 0.08)";
   ctx.beginPath();
   ctx.ellipse(cx - rx * 0.22, cy - rx * 0.28, rx * 0.26, rx * 0.16, -0.35, 0, Math.PI * 2);
   ctx.fill();
 
   traceRockVisual(ctx, px, py);
-  ctx.strokeStyle = "rgba(20, 50, 60, 0.35)";
+  ctx.strokeStyle = "rgba(0, 0, 0, 0.28)";
   ctx.lineWidth = 1.6;
   ctx.stroke();
 
-  ctx.strokeStyle = "rgba(120, 210, 230, 0.55)";
-  ctx.lineWidth = 2;
+  ctx.strokeStyle = "rgba(90, 110, 118, 0.22)";
+  ctx.lineWidth = 1.4;
   ctx.beginPath();
-  ctx.moveTo(cx - rx * 0.42, cy - rx * 0.38);
-  ctx.lineTo(cx + rx * 0.42, cy + rx * 0.38);
-  ctx.moveTo(cx + rx * 0.42, cy - rx * 0.38);
-  ctx.lineTo(cx - rx * 0.42, cy + rx * 0.38);
+  ctx.moveTo(cx - rx * 0.38, cy - rx * 0.34);
+  ctx.lineTo(cx + rx * 0.38, cy + rx * 0.34);
+  ctx.moveTo(cx + rx * 0.38, cy - rx * 0.34);
+  ctx.lineTo(cx - rx * 0.38, cy + rx * 0.34);
   ctx.stroke();
 
   ctx.restore();

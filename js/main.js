@@ -28,6 +28,11 @@ import {
   tickItemPickupBanner,
 } from "./hud.js";
 import { getItem } from "./items.js";
+import { createBrotherBobby, playerHasBrotherBobby } from "./familiar.js";
+import { createOrbitalFlies } from "./orbitals.js";
+import { spawnBossRoomPedestal } from "./itemSpawner.js";
+import { destroyRock, isRockSolid } from "./destructibles.js";
+import { maxRedHalfHearts } from "./stats.js";
 import { collectPushableEntities, moveCircle, resolveCircleCollisions } from "./pushablePhysics.js";
 import { checkCampfireBurn, checkCampfireBurnEnemies, updateRedCampfires } from "./campfire.js";
 import { CAMPFIRE_DAMAGE, EXPLOSION_DAMAGE } from "./constants.js";
@@ -36,6 +41,7 @@ import {
   checkEnemyContact,
   damageEnemiesInExplosion,
   applyEnemyPushPhysics,
+  tickEnemyPoison,
   ENEMY_CONTACT_DAMAGE,
 } from "./enemies.js";
 import {
@@ -61,6 +67,15 @@ import {
   drawFloorDescent,
 } from "./cinematic.js";
 import { addBloodSmearToRoom } from "./floorSmears.js";
+
+function syncFamiliarAndOrbitals() {
+  if (playerHasBrotherBobby(game.player)) {
+    if (!game.familiar) game.familiar = createBrotherBobby();
+  } else {
+    game.familiar = null;
+  }
+  game.orbitals = createOrbitalFlies(game.player.items);
+}
 
 function syncRoomEntities(cell) {
   game.chest = cell?.chest ?? null;
@@ -136,6 +151,7 @@ function updatePedestal(dt) {
   const item = getItem(itemId);
   if (item) showItemPickup(item);
   updateItemBar(game.player.items);
+  syncFamiliarAndOrbitals();
   sfx.pickup();
 }
 
@@ -176,6 +192,33 @@ function checkPlayerDeath() {
   }
 }
 
+function respawnWithExtraLife() {
+  const stats = game.player.stats;
+  stats.extraLives -= 1;
+  stats.health = maxRedHalfHearts(stats);
+
+  const roomGx = game.respawnRoom?.gx ?? game.dungeon.start.gx;
+  const roomGy = game.respawnRoom?.gy ?? game.dungeon.start.gy;
+  const cell = getCurrentRoomData(game.dungeon, roomGx, roomGy);
+
+  game.gx = roomGx;
+  game.gy = roomGy;
+  game.room = cell.room;
+  syncRoomEntities(cell);
+
+  const spawn = getSpawnPosition(cell.room);
+  game.player.respawnWithExtraLife(spawn.x, spawn.y);
+  game.player.stats = stats;
+  game.tears = [];
+  game.bursts = [];
+  game.bloodTears = [];
+  game.bombs = cell.bombs ?? [];
+  syncFamiliarAndOrbitals();
+  hideBossHud();
+  if (cell?.isBoss && cell.boss?.alive) showBossHud(cell.boss);
+  updateHud();
+}
+
 function regenerateFloor() {
   const dungeon = generateDungeon(Date.now(), 1);
   const start = getCurrentRoomData(dungeon, dungeon.start.gx, dungeon.start.gy);
@@ -198,6 +241,9 @@ function regenerateFloor() {
   syncRoomEntities(start);
   syncRoomDoorLock(start.room, start);
   game.player.resetAt(spawn.x, spawn.y);
+  game.respawnRoom = { gx: dungeon.start.gx, gy: dungeon.start.gy };
+  game.familiar = null;
+  game.orbitals = null;
   hideBossHud();
   sfx.floorReset();
   updateHud();
@@ -232,6 +278,8 @@ function completeFloorDescent() {
   game.player.stats = stats;
   game.player.items = items;
   game.player.shootRate = game.player.getTearModifiers().shootRate;
+  game.player.bodyScale = game.player.getTearModifiers().bodyScale ?? 1;
+  syncFamiliarAndOrbitals();
   hideBossHud();
   updateHud();
   updateItemBar(game.player.items);
@@ -267,8 +315,12 @@ function boot() {
     bombCooldown: 0,
     roomTransition: null,
     worldTime: 0,
+    familiar: null,
+    orbitals: null,
+    respawnRoom: { gx: dungeon.start.gx, gy: dungeon.start.gy },
   };
 
+  syncFamiliarAndOrbitals();
   syncRoomDoorLock(start.room, start);
   if (game.room) {
     game.room.pedestal = start.pedestal?.active ? start.pedestal : null;
@@ -447,6 +499,7 @@ function finishRoomTransition() {
   game.gx = transition.gx;
   game.gy = transition.gy;
   game.room = transition.room;
+  game.respawnRoom = { gx: transition.fromGx, gy: transition.fromGy };
   const cell = getCurrentRoomData(game.dungeon, game.gx, game.gy);
   syncRoomEntities(cell);
   game.player.x = transition.entryX;
@@ -522,7 +575,11 @@ function update(dt) {
     game.worldTime += dt;
     game.player.updateDeath(dt);
     if (game.player.isDead) {
-      regenerateFloor();
+      if (game.player.stats.extraLives > 0) {
+        respawnWithExtraLife();
+      } else {
+        regenerateFloor();
+      }
     }
     for (const burst of game.bursts) burst.update(dt);
     game.bursts = game.bursts.filter((b) => !b.dead);
@@ -541,6 +598,17 @@ function update(dt) {
   if (tears?.length) {
     game.tears.push(...tears);
     sfx.shoot();
+    if (game.familiar) {
+      const bobbyTear = game.familiar.tryShoot(game.player, game.player.headDir);
+      if (bobbyTear) game.tears.push(bobbyTear);
+    }
+  }
+
+  if (game.familiar) {
+    game.familiar.update(dt, game.player);
+  }
+  if (game.orbitals) {
+    game.orbitals.update(dt, game.player, game.enemies, game.bloodTears);
   }
 
   if (checkCampfireBurn(game.player, game.room)) {
@@ -674,6 +742,16 @@ function onBossDeath(cell, boss) {
   sfx.bossDeath();
   refreshDoorLockState(cell, game.room);
   hideBossHud();
+
+  if (isRockSolid(game.room, 6, 3)) {
+    destroyRock(game.room, 6, 3);
+  }
+  spawnBossRoomPedestal(cell, game.room, Math.random);
+  game.pedestal = cell.pedestal ?? null;
+  if (game.room) {
+    game.room.pedestal = cell.pedestal?.active ? cell.pedestal : null;
+  }
+
   game.trapdoor = spawnTrapdoor(game.room, game.player);
   cell.trapdoor = game.trapdoor;
   spawnSmokePuff(game.trapdoor.x, game.trapdoor.y);
@@ -740,6 +818,7 @@ function updateEnemies(dt) {
   let statsChanged = false;
 
   for (const enemy of game.enemies) {
+    tickEnemyPoison(enemy, dt);
     const result = enemy.update(dt, game.room, game.player);
     if (result.bloodTears?.length) {
       game.bloodTears.push(...result.bloodTears);
@@ -799,6 +878,14 @@ function drawWorldContents(layout, bombs = game.bombs, screenOverride = null) {
   if (game.boss) game.boss.draw(ctx, layout);
 
   if (game.trapdoor) game.trapdoor.draw(ctx, layout);
+
+  if (game.orbitals) {
+    game.orbitals.draw(ctx, layout, game.player);
+  }
+
+  if (game.familiar) {
+    game.familiar.draw(ctx, layout);
+  }
 
   game.player.draw(ctx, layout, screenOverride);
 }

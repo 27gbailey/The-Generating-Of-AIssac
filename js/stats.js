@@ -13,6 +13,7 @@ export function createPlayerStats() {
     pennies: 0,
     keys: 0,
     bombs: START_BOMBS,
+    extraLives: 0,
   };
 }
 

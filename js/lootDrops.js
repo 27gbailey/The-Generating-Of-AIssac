@@ -36,11 +36,11 @@ export function spawnLootAtTile(loot, tx, ty, spread = 10, rand = Math.random) {
 
 export function rollClearRoomLoot(rand = Math.random) {
   const roll = rand();
-  if (roll < 0.52) return "penny";
-  if (roll < 0.68) return "half_heart";
-  if (roll < 0.8) return "bomb";
-  if (roll < 0.9) return "key";
-  if (roll < 0.96) return "soul_heart";
+  if (roll < 0.55) return "penny";
+  if (roll < 0.72) return "half_heart";
+  if (roll < 0.84) return "bomb";
+  if (roll < 0.94) return "key";
+  if (roll < 0.97) return "soul_heart";
   return "penny";
 }
 

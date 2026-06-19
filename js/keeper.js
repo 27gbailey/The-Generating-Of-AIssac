@@ -58,8 +58,12 @@ export function drawKeeper(ctx, px, py, destroyed = false) {
 
   const sx = px + 32;
   const sy = py + 38;
+  const scale = 1.5;
 
   ctx.save();
+  ctx.translate(sx, sy);
+  ctx.scale(scale, scale);
+  ctx.translate(-sx, -sy);
 
   ctx.fillStyle = "rgba(0,0,0,0.28)";
   ctx.beginPath();

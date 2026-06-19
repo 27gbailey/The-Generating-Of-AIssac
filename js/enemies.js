@@ -17,6 +17,7 @@ import { resolveCircleCollisions, moveCircle } from "./pushablePhysics.js";
 import { isBlueRockSolid, isPotSolid, isRockSolid } from "./destructibles.js";
 import { isPoopSolid } from "./poop.js";
 import { isBarrelSolid } from "./barrel.js";
+import { playerHasSkatole } from "./items.js";
 
 const HORF_SHOOT_COOLDOWN = 1.8;
 const HORF_SHOOT_RANGE = TILE_SIZE * 9;
@@ -95,6 +96,8 @@ export class Enemy {
     this.vy = 0;
     this.flying = false;
     this.harmless = false;
+    this.poisonTime = 0;
+    this.poisonTick = 0;
   }
 
   takeDamage(amount) {
@@ -444,6 +447,16 @@ export class AttackFly extends Enemy {
     this.hitRadius = 14;
     this.hitHeightStretch = 1.45;
     this.wingPhase = Math.random() * Math.PI * 2;
+    this.wanderTimer = Math.random() * 2;
+    this.wanderDirX = 0;
+    this.wanderDirY = 0;
+  }
+
+  pickWanderDirection() {
+    const angle = Math.random() * Math.PI * 2;
+    this.wanderDirX = Math.cos(angle);
+    this.wanderDirY = Math.sin(angle);
+    this.wanderTimer = 1.1 + Math.random() * 2.2;
   }
 
   update(dt, room, player) {
@@ -451,6 +464,16 @@ export class AttackFly extends Enemy {
     if (this.hitFlash > 0) this.hitFlash -= dt;
     this.wingPhase += dt;
 
+    if (playerHasSkatole(player)) {
+      this.harmless = true;
+      this.wanderTimer -= dt;
+      if (this.wanderTimer <= 0) this.pickWanderDirection();
+      const step = FLY_WANDER_SPEED * dt;
+      tryMove(this, this.x + this.wanderDirX * step, this.y + this.wanderDirY * step, room);
+      return { bloodTears: [] };
+    }
+
+    this.harmless = false;
     const chest = player.chestPosition?.() ?? { x: player.x, y: player.y };
     let dx = chest.x - this.x;
     let dy = chest.y - this.y;
@@ -510,6 +533,16 @@ export class PooterFly extends Enemy {
     if (this.hitFlash > 0) this.hitFlash -= dt;
     this.wingPhase += dt;
 
+    if (playerHasSkatole(player)) {
+      this.harmless = true;
+      this.wanderTimer -= dt;
+      if (this.wanderTimer <= 0) this.pickWanderDirection();
+      const step = FLY_WANDER_SPEED * dt;
+      tryMove(this, this.x + this.wanderDirX * step, this.y + this.wanderDirY * step, room);
+      return { bloodTears: [] };
+    }
+
+    this.harmless = false;
     const bloodTears = [];
     const chest = player.chestPosition?.() ?? { x: player.x, y: player.y };
     const dist = Math.hypot(chest.x - this.x, chest.y - this.y);
@@ -563,6 +596,16 @@ export class PooterFly extends Enemy {
   }
 }
 
+export function tickEnemyPoison(enemy, dt) {
+  if (!enemy.alive || enemy.poisonTime <= 0) return;
+  enemy.poisonTime -= dt;
+  enemy.poisonTick -= dt;
+  if (enemy.poisonTick <= 0) {
+    enemy.poisonTick = 0.45;
+    enemy.takeDamage(0.5);
+  }
+}
+
 export function createEnemy(type, x, y) {
   switch (type) {
     case "horf":
@@ -591,11 +634,17 @@ export function hasAliveEnemies(enemies = []) {
 export function checkEnemyContact(player, enemies) {
   const chest = player.chestPosition?.() ?? { x: player.x, y: player.y };
   const pr = player.bodyRadius ?? player.radius;
+  const hasSkatole = playerHasSkatole(player);
+  const poisonTouch = player.getTearModifiers?.()?.poisonTouch ?? false;
 
   for (const enemy of enemies) {
     if (!enemy.alive) continue;
     if (enemy.harmless) continue;
+    if (hasSkatole && (enemy.type === "attack_fly" || enemy.type === "pooter_fly")) continue;
     if (Math.hypot(chest.x - enemy.x, chest.y - enemy.y) < pr + enemy.radius) {
+      if (poisonTouch) {
+        enemy.poisonTime = Math.max(enemy.poisonTime ?? 0, 3);
+      }
       return enemy;
     }
   }

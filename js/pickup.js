@@ -250,7 +250,6 @@ export function rollGoldenChestLoot(rand) {
 }
 
 export function rollChestLoot(rand) {
-  if (rand() < 0.1) return [];
   const loot = [];
   const pennyCount = rand() < 0.68 ? 1 + Math.floor(rand() * 3) : 0;
   if (pennyCount) for (let i = 0; i < pennyCount; i++) loot.push({ type: "penny" });

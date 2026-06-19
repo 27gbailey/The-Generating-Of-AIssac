@@ -1,6 +1,7 @@
 import { drawItemSprite } from "./items.js";
 
-export const PEDESTAL_HIT_RADIUS = 20;
+export const PEDESTAL_HIT_RADIUS = 22;
+export const PEDESTAL_COLLISION_RADIUS = 14;
 export const PEDESTAL_BASE_RADIUS = 24;
 
 export class Pedestal {
@@ -9,6 +10,7 @@ export class Pedestal {
     this.y = y;
     this.itemId = itemId;
     this.hitRadius = PEDESTAL_HIT_RADIUS;
+    this.collisionRadius = PEDESTAL_COLLISION_RADIUS;
     this.active = true;
     this.itemTaken = false;
     this.bobPhase = Math.random() * Math.PI * 2;
@@ -22,8 +24,9 @@ export class Pedestal {
     if (this.itemTaken) return null;
 
     const chest = player.chestPosition?.() ?? { x: player.x, y: player.y };
-    const dist = Math.hypot(chest.x - this.x, chest.y - this.y);
-    if (dist < (player.bodyRadius ?? player.radius) + this.hitRadius) {
+    const pickupY = this.y - 18;
+    const dist = Math.hypot(chest.x - this.x, chest.y - pickupY);
+    if (dist <= (player.bodyRadius ?? player.radius) + this.hitRadius) {
       this.itemTaken = true;
       return this.itemId;
     }

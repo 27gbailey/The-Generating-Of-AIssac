@@ -118,7 +118,7 @@ export const SECRET_PRESET_POOL = [
 ];
 
 /** Chance for a rock tile to become a blue rock when rooms are built. */
-export const BLUE_ROCK_REPLACE_CHANCE = 0.06;
+export const BLUE_ROCK_REPLACE_CHANCE = 0.03;
 /** Chance for a rock tile to become a pot instead (after blue rock roll). */
 export const POT_REPLACE_CHANCE = 0.14;
 

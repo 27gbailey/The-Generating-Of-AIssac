@@ -54,7 +54,7 @@ export const BOSS_DEFINITIONS = {
     hp: BOSS_HP,
     radius: BOSS_RADIUS,
     roomLayout: {
-      rocks: [[4, 2], [8, 2], [4, 4], [8, 4]],
+      rocks: [[4, 2], [8, 2], [4, 4], [8, 4], [6, 3]],
       poops: [[3, 3], [9, 3]],
       redCampfires: [[1, 3], [11, 3], [3, 1], [9, 1], [3, 5], [9, 5]],
       skipPerimeter: true,

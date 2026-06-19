@@ -3,7 +3,7 @@ import { getBodyVector, getHeadVector } from "./input.js";
 import { spawnTears } from "./tear.js";
 import { createPlayerStats } from "./stats.js";
 import { damage } from "./stats.js";
-import { computeTearModifiers } from "./items.js";
+import { computeTearModifiers, applyItemPickupEffects } from "./items.js";
 import { INVINCIBILITY_DURATION, BODY_RADIUS, CHEST_OFFSET_Y } from "./constants.js";
 
 const DEFAULT_BODY = { x: 0, y: 1 };
@@ -29,6 +29,7 @@ export class AIsaac {
     this.isWalking = false;
     this.shootCooldown = 0;
     this.shootRate = 0.32;
+    this.bodyScale = 1;
     this.items = [];
     this.stats = createPlayerStats();
     this.invincibleTime = 0;
@@ -50,7 +51,7 @@ export class AIsaac {
   headPosition() {
     const hx = this.headOffsetX();
     const hy = -8 + this.headOffsetY();
-    const scale = 1.35;
+    const scale = 1.35 * (this.bodyScale ?? 1);
     return { x: this.x + hx * this.facing * scale, y: this.y + hy * scale };
   }
 
@@ -65,8 +66,10 @@ export class AIsaac {
 
     if (bodyVector) {
       this.bodyDir = bodyVector;
-      this.vx += bodyVector.x * this.acceleration * dt;
-      this.vy += bodyVector.y * this.acceleration * dt;
+      const mods = this.getTearModifiers();
+      const accel = this.acceleration * (mods.speedMult ?? 1);
+      this.vx += bodyVector.x * accel * dt;
+      this.vy += bodyVector.y * accel * dt;
       if (Math.abs(bodyVector.x) > 0.05) {
         this.facing = bodyVector.x >= 0 ? 1 : -1;
       }
@@ -84,9 +87,11 @@ export class AIsaac {
     }
 
     const speed = Math.hypot(this.vx, this.vy);
-    if (speed > this.maxSpeed) {
-      this.vx = (this.vx / speed) * this.maxSpeed;
-      this.vy = (this.vy / speed) * this.maxSpeed;
+    const mods = this.getTearModifiers();
+    const maxSpeed = this.maxSpeed * (mods.speedMult ?? 1);
+    if (speed > maxSpeed) {
+      this.vx = (this.vx / speed) * maxSpeed;
+      this.vy = (this.vy / speed) * maxSpeed;
     }
 
     this.moveWithCollision(dt, room);
@@ -165,6 +170,19 @@ export class AIsaac {
     this.headDir = { ...DEFAULT_HEAD };
     this.facing = 1;
     this.shootCooldown = 0;
+    this.bodyScale = 1;
+  }
+
+  respawnWithExtraLife(x, y) {
+    this.x = x;
+    this.y = y;
+    this.vx = 0;
+    this.vy = 0;
+    this.deathState = null;
+    this.invincibleTime = INVINCIBILITY_DURATION * 2;
+    const mods = this.getTearModifiers();
+    this.shootRate = mods.shootRate;
+    this.bodyScale = mods.bodyScale ?? 1;
   }
 
   getTearModifiers() {
@@ -174,8 +192,10 @@ export class AIsaac {
   addItem(itemId) {
     if (!itemId) return false;
     this.items.push(itemId);
+    applyItemPickupEffects(this, itemId);
     const mods = this.getTearModifiers();
     this.shootRate = mods.shootRate;
+    this.bodyScale = mods.bodyScale ?? 1;
     return true;
   }
 
@@ -198,7 +218,7 @@ export class AIsaac {
 
     const bob = this.isWalking ? Math.sin(this.walkPhase) * 2 : 0;
     const legSwing = this.isWalking ? Math.sin(this.walkPhase) * 7 : 0;
-    const scale = 1.35;
+    const scale = 1.35 * (this.bodyScale ?? 1);
 
     ctx.save();
     ctx.translate(screenX, screenY + bob);
@@ -222,7 +242,7 @@ export class AIsaac {
     const p = Math.min(1, t / dur);
     const fall = Math.min(1, p / 0.55);
     const slump = Math.max(0, Math.min(1, (p - 0.35) / 0.35));
-    const scale = 1.35;
+    const scale = 1.35 * (this.bodyScale ?? 1);
 
     ctx.save();
     ctx.translate(screenX, screenY + slump * 18 + fall * 6);

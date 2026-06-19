@@ -1,4 +1,4 @@
-import { TILE_SIZE } from "./constants.js";
+import { TEAR_DAMAGE, TILE_SIZE } from "./constants.js";
 import { barrelExplosionCenter, damageBarrel, findBarrelHit } from "./barrel.js";
 import { damageCampfire, findCampfireHit } from "./campfire.js";
 import { circleHitsRoom, findPoopHit } from "./roomSpace.js";
@@ -60,10 +60,15 @@ export class Tear {
     this.vx = dirX * speed;
     this.vy = dirY * speed;
     this.speed = speed;
-    this.radius = TEAR_RADIUS;
+    const damage = options.damage ?? TEAR_DAMAGE;
+    this.damage = damage;
+    const tearSizeMult = options.tearSizeMult ?? damage / TEAR_DAMAGE;
+    this.radius =
+      options.radius ?? TEAR_RADIUS * (0.75 + tearSizeMult * 0.35);
+    this.color = options.color ?? "#8ecff5";
+    this.shadowColor = options.shadowColor ?? options.color ?? "#8ecff5";
     this.distance = 0;
     this.maxRange = options.maxRange ?? TEAR_MAX_RANGE;
-    this.damage = options.damage ?? 3.5;
     this.homing = options.homing ?? false;
     this.boomerang = options.boomerang ?? false;
     this.returning = false;
@@ -214,8 +219,9 @@ export class Tear {
       ctx.stroke();
     }
 
-    ctx.fillStyle = this.boomerang && this.returning ? "#a8e0ff" : "#8ecff5";
-    ctx.shadowColor = "#8ecff5";
+    ctx.fillStyle =
+      this.boomerang && this.returning ? "#a8e0ff" : this.color ?? "#8ecff5";
+    ctx.shadowColor = this.shadowColor ?? this.color ?? "#8ecff5";
     ctx.shadowBlur = 10;
     ctx.beginPath();
     ctx.arc(screenX, screenY, this.radius, 0, Math.PI * 2);
@@ -236,6 +242,7 @@ export function spawnTears(player, headDir, headPos = null) {
     maxRange: mods.maxRange,
     homing: mods.homing,
     boomerang: mods.boomerang,
+    tearSizeMult: mods.tearSizeMult ?? 1,
     player,
   };
 
