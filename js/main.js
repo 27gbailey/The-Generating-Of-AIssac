@@ -15,7 +15,6 @@ import {
   entryPosition,
   isBossDoor,
   isItemDoor,
-  isBossDoor,
   revealSecretEntrance,
 } from "./dungeon.js";
 import { drawMinimap } from "./minimap.js";
