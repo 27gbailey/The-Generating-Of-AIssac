@@ -18,6 +18,7 @@ import {
   updateRoomAmbience,
 } from "./roomAmbience.js";
 import { drawFloorSmears } from "./floorSmears.js";
+import { drawKeeper } from "./keeper.js";
 
 const TILE_COLORS = {
   [TILE.FLOOR]: "#8f8170",
@@ -127,7 +128,7 @@ function drawWallInnerShadow(ctx, x, y, w, h, horizontal, wallSide) {
   }
 }
 
-function drawDoor(ctx, originX, originY, segment, wall, locked = false, broken = false) {
+function drawDoor(ctx, originX, originY, segment, wall, locked = false, broken = false, golden = false, floorNumber = 1, goldenOpened = false) {
   const x = originX + segment.x;
   const y = originY + segment.y;
 
@@ -148,12 +149,26 @@ function drawDoor(ctx, originX, originY, segment, wall, locked = false, broken =
     return;
   }
 
-  ctx.fillStyle = DOOR_INNER;
+  ctx.fillStyle = golden ? "#3a3018" : DOOR_INNER;
   ctx.fillRect(x, y, segment.w, segment.h);
 
-  ctx.strokeStyle = DOOR_FRAME;
-  ctx.lineWidth = 2;
+  ctx.strokeStyle = golden ? "#c8a030" : DOOR_FRAME;
+  ctx.lineWidth = golden ? 3 : 2;
   ctx.strokeRect(x + 1, y + 1, segment.w - 2, segment.h - 2);
+
+  if (golden) {
+    ctx.fillStyle = "#ffe878";
+    ctx.font = "bold 11px Georgia, serif";
+    ctx.textAlign = "center";
+    ctx.fillText("♛", x + segment.w / 2, y + segment.h / 2 + 4);
+    if (floorNumber >= 2 && !goldenOpened) {
+      ctx.fillStyle = "rgba(40, 30, 10, 0.55)";
+      ctx.fillRect(x + 2, y + 2, segment.w - 4, segment.h - 4);
+      ctx.fillStyle = "#e8c848";
+      ctx.font = "bold 9px system-ui,sans-serif";
+      ctx.fillText("KEY", x + segment.w / 2, y + segment.h / 2 + 3);
+    }
+  }
 
   ctx.strokeStyle = "rgba(255,255,255,0.06)";
   ctx.lineWidth = 1;
@@ -187,7 +202,8 @@ function drawDoor(ctx, originX, originY, segment, wall, locked = false, broken =
   }
 }
 
-function drawWalls(ctx, originX, originY, width, height, room, isBoss = false) {
+function drawWalls(ctx, originX, originY, width, height, room, options = {}) {
+  const { isBoss = false, isItemRoom = false, floorNumber = 1 } = options;
   textureBand(ctx, originX, originY, width, WALL_THICKNESS, true, "north");
   textureBand(
     ctx,
@@ -217,13 +233,33 @@ function drawWalls(ctx, originX, originY, width, height, room, isBoss = false) {
     ctx.fillRect(originX + width - WALL_THICKNESS, originY, WALL_THICKNESS, height);
   }
 
+  if (isItemRoom) {
+    ctx.fillStyle = "rgba(90, 70, 15, 0.35)";
+    ctx.fillRect(originX, originY, width, WALL_THICKNESS);
+    ctx.fillRect(originX, originY + height - WALL_THICKNESS, width, WALL_THICKNESS);
+    ctx.fillRect(originX, originY, WALL_THICKNESS, height);
+    ctx.fillRect(originX + width - WALL_THICKNESS, originY, WALL_THICKNESS, height);
+  }
+
   for (const wall of DOOR_WALLS) {
     if (!room.doors[wall]) continue;
     const segment = doorSegment(wall);
     if (!segment) continue;
     const locked = room.doorLock?.locked && !room.doorLock?.broken?.[wall];
     const broken = room.doorLock?.broken?.[wall];
-    drawDoor(ctx, originX, originY, segment, wall, locked, broken);
+    const golden = room.goldenDoorWall === wall;
+    drawDoor(
+      ctx,
+      originX,
+      originY,
+      segment,
+      wall,
+      locked,
+      broken,
+      golden,
+      floorNumber,
+      room.goldenDoorOpened
+    );
   }
 }
 
@@ -287,6 +323,9 @@ export function drawRoom(ctx, room, offsetX, offsetY, options = {}) {
           isRed: code === TILE.RED_CAMPFIRE,
           flicker: state.flicker ?? 0,
         });
+      } else if (code === TILE.KEEPER) {
+        const state = room.keeperStates?.[`${x},${y}`] ?? { destroyed: false };
+        drawKeeper(ctx, px, py, state.destroyed);
       } else if (code !== TILE.FLOOR) {
         ctx.fillStyle = TILE_COLORS[code] ?? "#ff00ff";
         ctx.fillRect(px + 4, py + 4, TILE_SIZE - 8, TILE_SIZE - 8);
@@ -297,7 +336,11 @@ export function drawRoom(ctx, room, offsetX, offsetY, options = {}) {
     }
   }
 
-  drawWalls(ctx, originX, originY, width, height, room, options.isBoss);
+  drawWalls(ctx, originX, originY, width, height, room, {
+    isBoss: options.isBoss,
+    isItemRoom: options.isItemRoom,
+    floorNumber: options.floorNumber ?? room.floorNumber ?? 1,
+  });
 
   if (options.cellKey && options.dungeonSeed != null) {
     const ambience = getAmbience(options.cellKey, options.dungeonSeed);

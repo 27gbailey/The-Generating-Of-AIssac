@@ -19,22 +19,31 @@ export function syncRoomDoorLock(room, cell) {
     locked: cell?.doorsLocked ?? false,
     broken: cell?.brokenDoors ?? createBrokenDoors(),
   };
+  room.goldenDoorWall = cell?.goldenDoorWall ?? null;
+  room.goldenDoorOpened = cell?.goldenDoorOpened ?? false;
+  room.floorNumber = cell?.floorNumber ?? 1;
 }
 
-export function isDoorPassable(room, wall) {
+export function isDoorPassable(room, wall, cell = null, floorNumber = null) {
   if (!room?.doors?.[wall]) return false;
   if (room.doorLock?.broken?.[wall]) return true;
+
+  const floor = floorNumber ?? cell?.floorNumber ?? room.floorNumber ?? 1;
+  const goldenWall = cell?.goldenDoorWall ?? room.goldenDoorWall;
+  const goldenOpened = cell?.goldenDoorOpened ?? room.goldenDoorOpened;
+
+  if (goldenWall === wall && floor >= 2 && !goldenOpened) return false;
   if (room.doorLock?.locked) return false;
   return true;
 }
 
-export function isDoorBlocked(room, wall) {
+export function isDoorBlocked(room, wall, cell = null, floorNumber = null) {
   if (!room?.doors?.[wall]) return true;
-  return !isDoorPassable(room, wall);
+  return !isDoorPassable(room, wall, cell, floorNumber);
 }
 
 export function tryBreakDoorsFromExplosion(cell, room, cx, cy, radiusX, radiusY, canBreakDoor) {
-  if (!cell || !room?.doorLock?.locked) return false;
+  if (!cell || !room) return false;
 
   const rx = radiusX * DOOR_BREAK_RADIUS_SCALE;
   const ry = radiusY * DOOR_BREAK_RADIUS_SCALE;
@@ -44,6 +53,7 @@ export function tryBreakDoorsFromExplosion(cell, room, cx, cy, radiusX, radiusY,
     if (!room.doors[wall]) continue;
     if (room.doorLock.broken[wall]) continue;
     if (!canBreakDoor(wall)) continue;
+    if (!room.doorLock?.locked) continue;
     if (!explosionHitsDoor(wall, cx, cy, rx, ry)) continue;
 
     cell.brokenDoors[wall] = true;
@@ -51,9 +61,7 @@ export function tryBreakDoorsFromExplosion(cell, room, cx, cy, radiusX, radiusY,
     brokeAny = true;
   }
 
-  if (brokeAny) {
-    refreshDoorLockState(cell, room);
-  }
+  if (brokeAny) refreshDoorLockState(cell, room);
   return brokeAny;
 }
 
@@ -145,4 +153,11 @@ export function lockDoorsForEnemies(cell, room) {
 
 export function countAliveEnemies(enemies = []) {
   return enemies.filter((e) => e.alive).length;
+}
+
+export function explosionHitsSecretWall(cell, cx, cy, radiusX, radiusY) {
+  if (!cell?.secretLink || cell.secretRevealed) return false;
+  const rx = radiusX * DOOR_BREAK_RADIUS_SCALE;
+  const ry = radiusY * DOOR_BREAK_RADIUS_SCALE;
+  return explosionHitsDoor(cell.secretLink.wall, cx, cy, rx, ry);
 }

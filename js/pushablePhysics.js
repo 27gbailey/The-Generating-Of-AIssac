@@ -85,10 +85,11 @@ export function moveCircle(entity, dt, room, entities, friction) {
   entity.vy *= friction;
 }
 
-export function collectPushableEntities({ chest, pickups, bombs }) {
+export function collectPushableEntities({ chest, pickups, bombs, enemies = [] }) {
   const list = [];
   if (chest) list.push(chest);
   for (const pickup of pickups ?? []) if (!pickup.dead) list.push(pickup);
   for (const bomb of bombs ?? []) if (bomb.alive) list.push(bomb);
+  for (const enemy of enemies ?? []) if (enemy.alive) list.push(enemy);
   return list;
 }

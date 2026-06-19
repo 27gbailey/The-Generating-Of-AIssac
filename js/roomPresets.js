@@ -5,6 +5,8 @@ import {
   ROOM_HEIGHT,
   ROOM_WIDTH,
   TILE,
+  ITEM_ROOM_PRESET,
+  SECRET_PRESET_POOL,
 } from "./constants.js";
 import { createEmptyGrid, decodeRoomId, encodeRoomId } from "./roomId.js";
 import { applyRoomObjectVariants } from "./roomVariants.js";
@@ -33,6 +35,7 @@ function buildLayout({
   barrels = [],
   campfires = [],
   redCampfires = [],
+  keepers = [],
   pickups = [],
   skipPerimeter = false,
   perimeter = "normal",
@@ -44,6 +47,7 @@ function buildLayout({
   for (const [x, y] of barrels) place(grid, x, y, TILE.BARREL);
   for (const [x, y] of campfires) place(grid, x, y, TILE.CAMPFIRE);
   for (const [x, y] of redCampfires) place(grid, x, y, TILE.RED_CAMPFIRE);
+  for (const [x, y] of keepers) place(grid, x, y, TILE.KEEPER);
   if (!skipPerimeter) applyPerimeterRing(grid, perimeter);
   return { grid, pickups: normalizePickups(pickups) };
 }
@@ -524,6 +528,37 @@ const PRESET_LAYOUTS = {
   },
 
   ...getBossRoomLayouts(),
+
+  item_room: { skipPerimeter: true },
+
+  secret_hoard: {
+    skipPerimeter: true,
+    rocks: [[4, 3], [8, 3]],
+    pickups: [["penny", 6, 3], ["penny", 5, 4], ["bomb", 7, 4]],
+  },
+  secret_shrine: {
+    skipPerimeter: true,
+    campfires: [[6, 3]],
+    pickups: [["soul_heart", 6, 4]],
+    keepers: [[3, 0], [9, 0]],
+  },
+  secret_nest: {
+    skipPerimeter: true,
+    poops: [[5, 3], [7, 3], [6, 4]],
+    barrels: [[4, 4], [8, 4]],
+    keepers: [[2, 0], [10, 0]],
+  },
+  secret_vault: {
+    skipPerimeter: true,
+    rocks: [[5, 2], [7, 2], [6, 4]],
+    pickups: [["key", 6, 3], ["bomb", 5, 4]],
+  },
+  secret_keeper_hall: {
+    skipPerimeter: true,
+    keepers: [[2, 0], [5, 0], [8, 0], [10, 0]],
+    campfires: [[6, 4]],
+    poops: [[4, 3], [8, 3]],
+  },
 };
 
 const LAYOUT_BUILDERS = Object.fromEntries(
@@ -535,9 +570,15 @@ const LAYOUT_BUILDERS = Object.fromEntries(
 
 export const BOSS_PRESET = getActiveBossDefinition().presetId;
 const BOSS_PRESET_IDS = new Set(getBossPresetIds());
+const SPECIAL_PRESET_IDS = new Set([
+  ...BOSS_PRESET_IDS,
+  ITEM_ROOM_PRESET,
+  ...SECRET_PRESET_POOL,
+  "boss_chamber",
+]);
 
 export const ROOM_PRESET_POOL = Object.keys(LAYOUT_BUILDERS).filter(
-  (id) => !BOSS_PRESET_IDS.has(id) && id !== "boss_chamber"
+  (id) => !SPECIAL_PRESET_IDS.has(id)
 );
 
 export const ROOM_PRESETS = Object.fromEntries(
@@ -548,10 +589,16 @@ export const ROOM_PRESETS = Object.fromEntries(
       {
         id,
         name:
-          id === BOSS_PRESET || BOSS_PRESET_IDS.has(id)
-            ? `${getActiveBossDefinition().name}'s Chamber`
-            : formatPresetName(id),
+          id === ITEM_ROOM_PRESET
+            ? "Item Room"
+            : SECRET_PRESET_POOL.includes(id)
+              ? "Secret Room"
+              : id === BOSS_PRESET || BOSS_PRESET_IDS.has(id)
+                ? `${getActiveBossDefinition().name}'s Chamber`
+                : formatPresetName(id),
         isBoss: id === BOSS_PRESET || BOSS_PRESET_IDS.has(id),
+        isItemRoom: id === ITEM_ROOM_PRESET,
+        isSecretRoom: SECRET_PRESET_POOL.includes(id),
         buildGrid: buildLayoutFn,
         presetPickups: pickups,
         baseRoomId: encodeRoomId(grid, {

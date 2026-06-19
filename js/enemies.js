@@ -10,6 +10,7 @@ import {
 } from "./constants.js";
 import { BloodTear } from "./bloodTear.js";
 import { circleHitsRoom } from "./roomSpace.js";
+import { resolveCircleCollisions, moveCircle } from "./pushablePhysics.js";
 import { isBlueRockSolid, isPotSolid, isRockSolid } from "./destructibles.js";
 import { isPoopSolid } from "./poop.js";
 import { isBarrelSolid } from "./barrel.js";
@@ -79,6 +80,8 @@ export class Enemy {
     this.alive = true;
     this.radius = 14;
     this.hitFlash = 0;
+    this.vx = 0;
+    this.vy = 0;
   }
 
   takeDamage(amount) {
@@ -203,7 +206,12 @@ export class Gaper extends Enemy {
       dy /= dist;
       if (Math.abs(dx) > 0.05) this.facing = dx >= 0 ? 1 : -1;
       const step = GAPER_SPEED * dt;
-      tryMove(this, this.x + dx * step, this.y + dy * step, room);
+      const nx = this.x + dx * step;
+      const ny = this.y + dy * step;
+      if (tryMove(this, nx, ny, room)) {
+        this.vx = dx * GAPER_SPEED * 0.5;
+        this.vy = dy * GAPER_SPEED * 0.5;
+      }
       this.walkPhase += dt * 10;
     }
 
@@ -282,7 +290,10 @@ export class Dip extends Enemy {
       this.phaseTimer = DIP_PAUSE_TIME + Math.random() * 0.5;
     } else {
       const step = DIP_BURST_SPEED * dt;
-      tryMove(this, this.x + this.vx * step, this.y + this.vy * step, room);
+      if (tryMove(this, this.x + this.vx * step, this.y + this.vy * step, room)) {
+        this.vx *= 0.92;
+        this.vy *= 0.92;
+      }
     }
 
     return { bloodTears: [] };
@@ -375,6 +386,15 @@ export function findEnemyHit(cx, cy, radius, enemies) {
     }
   }
   return null;
+}
+
+export function applyEnemyPushPhysics(enemies, room, pushables, dt) {
+  const live = enemies.filter((e) => e.alive);
+  const all = [...live, ...pushables];
+  for (const enemy of live) {
+    resolveCircleCollisions(enemy, all, 0.5);
+    moveCircle(enemy, dt, room, all, Math.exp(-9 * dt));
+  }
 }
 
 export { ENEMY_CONTACT_DAMAGE };

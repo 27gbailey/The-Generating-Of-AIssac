@@ -237,6 +237,18 @@ export function spillPickups(loot, cx, cy, rand) {
   });
 }
 
+export function rollGoldenChestLoot(rand) {
+  const loot = [];
+  const pennyCount = 2 + Math.floor(rand() * 4);
+  for (let i = 0; i < pennyCount; i++) loot.push({ type: "penny" });
+  if (rand() < 0.55) loot.push({ type: "key" });
+  if (rand() < 0.55) loot.push({ type: "bomb" });
+  if (rand() < 0.45) loot.push({ type: "half_heart" });
+  if (rand() < 0.22) loot.push({ type: "full_heart" });
+  if (rand() < 0.18) loot.push({ type: "soul_heart" });
+  return loot;
+}
+
 export function rollChestLoot(rand) {
   if (rand() < 0.1) return [];
   const loot = [];

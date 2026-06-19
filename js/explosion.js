@@ -19,6 +19,7 @@ import {
   destroyPot,
 } from "./destructibles.js";
 import { isPoopSolid } from "./poop.js";
+import { isKeeperSolid, destroyKeeper, rollKeeperLoot, spawnKeeperLoot } from "./keeper.js";
 import { rollBlueRockLoot, rollPotLoot, spawnLootAtTile } from "./lootDrops.js";
 
 export function pointInExplosion(px, py, cx, cy, radiusX = EXPLOSION_RADIUS_X, radiusY = EXPLOSION_RADIUS_Y) {
@@ -99,6 +100,10 @@ export function destroyObjectsInExplosion(room, cx, cy, radiusX = EXPLOSION_RADI
           const center = tileCenter(tx, ty);
           smokePoints.push({ x: center.x, y: center.y });
         }
+      } else if (code === TILE.KEEPER && isKeeperSolid(room, tx, ty)) {
+        destroyKeeper(room, tx, ty);
+        const loot = rollKeeperLoot(rand);
+        if (loot.length) spawnedPickups.push(...spawnKeeperLoot(loot, tx, ty, rand));
       }
     }
   }

@@ -13,6 +13,8 @@ import {
   checkDoorTransition,
   entryPosition,
   isBossDoor,
+  isItemDoor,
+  revealSecretEntrance,
 } from "./dungeon.js";
 import { drawMinimap } from "./minimap.js";
 import { initStatsHud, updateRoomHud, updateStatsHud } from "./hud.js";
@@ -23,6 +25,7 @@ import { sfx } from "./audio.js";
 import {
   checkEnemyContact,
   damageEnemiesInExplosion,
+  applyEnemyPushPhysics,
   ENEMY_CONTACT_DAMAGE,
 } from "./enemies.js";
 import {
@@ -30,6 +33,7 @@ import {
   refreshDoorLockState,
   syncRoomDoorLock,
   tryBreakDoorsFromExplosion,
+  explosionHitsSecretWall,
 } from "./doorLock.js";
 import { tryRoomClearReward } from "./pickupSpawner.js";
 import {
@@ -76,12 +80,16 @@ function updateChestsAndPickups(dt) {
     chest: game.chest,
     pickups: game.pickups,
     bombs: game.bombs,
+    enemies: game.enemies,
   });
 
   if (game.chest) {
     const wasClosed = !game.chest.opened;
     const spilled = game.chest.update(dt, game.room, game.player, pushables);
-    if (wasClosed && game.chest.opened) sfx.chestOpen();
+    if (wasClosed && game.chest.opened) {
+      sfx.chestOpen();
+      if (game.chest.requiresKey) updateStatsHud(game.player.stats);
+    }
     if (spilled.length) game.pickups.push(...spilled);
   }
 
@@ -137,7 +145,7 @@ function checkPlayerDeath() {
 }
 
 function regenerateFloor() {
-  const dungeon = generateDungeon(Date.now());
+  const dungeon = generateDungeon(Date.now(), 1);
   const start = getCurrentRoomData(dungeon, dungeon.start.gx, dungeon.start.gy);
   const spawn = getSpawnPosition(start.room);
 
@@ -166,7 +174,7 @@ function regenerateFloor() {
 function completeFloorDescent() {
   const stats = game.player.stats;
   const floorNumber = (game.floorNumber ?? 1) + 1;
-  const dungeon = generateDungeon(Date.now() + floorNumber * 99991);
+  const dungeon = generateDungeon(Date.now() + floorNumber * 99991, floorNumber);
   const start = getCurrentRoomData(dungeon, dungeon.start.gx, dungeon.start.gy);
   const spawn = getSpawnPosition(start.room);
 
@@ -194,7 +202,7 @@ function completeFloorDescent() {
 }
 
 function boot() {
-  const dungeon = generateDungeon();
+  const dungeon = generateDungeon(Date.now(), 1);
   const start = getCurrentRoomData(dungeon, dungeon.start.gx, dungeon.start.gy);
   if (!start?.room) {
     throw new Error("Dungeon start room is missing.");
@@ -252,6 +260,8 @@ function roomDrawOptions(gx, gy) {
     cellKey: `${gx},${gy}`,
     dungeonSeed: game.dungeon.seed,
     isBoss: cell?.isBoss ?? false,
+    isItemRoom: cell?.isItemRoom ?? false,
+    floorNumber: game.dungeon.floorNumber ?? game.floorNumber ?? 1,
     time: game.worldTime,
   };
 }
@@ -295,10 +305,15 @@ function triggerExplosion(x, y) {
           by,
           EXPLOSION_RADIUS_X,
           EXPLOSION_RADIUS_Y,
-          (wall) => !isBossDoor(game.dungeon, game.gx, game.gy, wall)
+          (wall) => !isBossDoor(game.dungeon, game.gx, game.gy, wall) && !isItemDoor(game.dungeon, game.gx, game.gy, wall)
         )
       ) {
         sfx.doorBreak();
+      }
+      if (explosionHitsSecretWall(cell, bx, by, EXPLOSION_RADIUS_X, EXPLOSION_RADIUS_Y)) {
+        if (revealSecretEntrance(game.dungeon, cell, cell.secretLink.wall)) {
+          sfx.doorBreak();
+        }
       }
       game.bursts.push(new BombExplosion(bx, by, EXPLOSION_RADIUS_X, EXPLOSION_RADIUS_Y));
       sfx.explosion();
@@ -344,6 +359,7 @@ function updateBombs(dt) {
     chest: game.chest,
     pickups: game.pickups,
     bombs: [],
+    enemies: game.enemies,
   });
 
   for (const bomb of liveBombs) {
@@ -491,6 +507,7 @@ function update(dt) {
 
   updateEnemies(dt);
   updateBoss(dt);
+  applyBossPushPhysics(game.boss, dt);
   updateTrapdoor(dt);
 
   const newBloodTears = updateRedCampfires(game.room, dt, game.player, Math.random);
@@ -528,6 +545,7 @@ function update(dt) {
     game.dungeon
   );
   if (transition && !game.player.isDying) {
+    if (transition.usedKey) updateStatsHud(game.player.stats);
     sfx.door();
     beginRoomTransition(transition);
     clearInputFrame(input);
@@ -643,6 +661,20 @@ function updateBoss(dt) {
   updateBossHud(boss);
 
   if (!boss.alive) onBossDeath(cell, boss);
+  else persistRoomEntities(cell);
+}
+
+function applyBossPushPhysics(boss, dt) {
+  if (!boss?.alive) return;
+  const pushables = collectPushableEntities({
+    chest: game.chest,
+    pickups: game.pickups,
+    bombs: game.bombs,
+    enemies: game.enemies,
+  });
+  const others = pushables.filter((e) => e !== boss);
+  resolveCircleCollisions(boss, others, 0.45);
+  moveCircle(boss, dt, game.room, others, Math.exp(-9 * dt));
 }
 
 function updateTrapdoor(dt) {
@@ -675,6 +707,14 @@ function updateEnemies(dt) {
   handleRoomClear(cell);
   if (statsChanged) updateStatsHud(game.player.stats);
   persistRoomEntities(cell);
+
+  const pushables = collectPushableEntities({
+    chest: game.chest,
+    pickups: game.pickups,
+    bombs: game.bombs,
+    enemies: game.enemies,
+  });
+  applyEnemyPushPhysics(game.enemies, game.room, pushables, dt);
 }
 
 function drawWorldContents(layout, bombs = game.bombs, screenOverride = null) {

@@ -2,6 +2,8 @@ import {
   DIRECTIONS,
   DOOR_WALLS,
   FLOOR_GRID_SIZE,
+  ITEM_ROOM_PRESET,
+  SECRET_PRESET_POOL,
 } from "./constants.js";
 import {
   BOSS_PRESET,
@@ -16,14 +18,14 @@ import { initPoopStates } from "./poop.js";
 import { initDestroyedRocks } from "./destructibles.js";
 import { initBarrelStates } from "./barrel.js";
 import { initCampfireStates } from "./campfire.js";
-import { spawnChestsInDungeon } from "./chestSpawner.js";
+import { spawnChestsInDungeon, spawnSecretRoomChests } from "./chestSpawner.js";
 import { createPickupsFromLayout } from "./pickup.js";
 import { spawnEnemiesInDungeon } from "./enemySpawner.js";
 import { createBrokenDoors, syncRoomDoorLock } from "./doorLock.js";
 import { initDestroyedPots } from "./pot.js";
-import { applyRoomObjectVariants } from "./roomVariants.js";
 import { createBoss, getActiveBossDefinition, getBossSpawnPosition } from "./boss.js";
 import { generateBossFloorSmears } from "./floorSmears.js";
+import { initKeeperStates } from "./keeper.js";
 
 function mulberry32(seed) {
   return function rand() {
@@ -71,10 +73,17 @@ function pickExpansionCell(cells, rand) {
   const deadEnds = occupied.filter((cell) => neighborCount(cells, cell.gx, cell.gy) === 1);
   const branchPoints = occupied.filter((cell) => {
     const count = neighborCount(cells, cell.gx, cell.gy);
-    return count >= 1 && count < 4 && expandableDirections(cells, cell.gx, cell.gy, rand).length > 0;
+    return count >= 2 && count < 4 && expandableDirections(cells, cell.gx, cell.gy, rand).length > 0;
   });
 
-  if (deadEnds.length > 0 && rand() < 0.72) {
+  if (branchPoints.length > 0 && (deadEnds.length === 0 || rand() < 0.62)) {
+    branchPoints.sort(
+      (a, b) => neighborCount(cells, b.gx, b.gy) - neighborCount(cells, a.gx, a.gy)
+    );
+    const top = branchPoints.slice(0, Math.min(4, branchPoints.length));
+    return top[Math.floor(rand() * top.length)];
+  }
+  if (deadEnds.length > 0 && rand() < 0.34) {
     return deadEnds[Math.floor(rand() * deadEnds.length)];
   }
   if (branchPoints.length > 0) {
@@ -167,10 +176,15 @@ function computeDoors(cell, cells, presetId) {
 
   for (const wall of DOOR_WALLS) {
     const { dx, dy, opposite } = DIRECTIONS[wall];
-    if (!cells[`${cell.gx + dx},${cell.gy + dy}`]) continue;
+    const neighborKey = `${cell.gx + dx},${cell.gy + dy}`;
+    const neighbor = cells[neighborKey];
+    if (!neighbor) continue;
     if (blocked[wall]) continue;
 
-    const neighbor = cells[`${cell.gx + dx},${cell.gy + dy}`];
+    if (cell.isSecret && !cell.secretRevealed) continue;
+    if (neighbor.isSecret && !neighbor.secretRevealed) continue;
+    if (cell.secretLink && !cell.secretRevealed && cell.secretLink.wall === wall) continue;
+
     const neighborBlocked = getBlockedWalls(presetGrid(neighbor.presetId ?? "empty"));
     if (neighborBlocked[opposite]) continue;
 
@@ -182,6 +196,7 @@ function computeDoors(cell, cells, presetId) {
 
 function ensureMinimumConnectivity(cells, rand) {
   for (const cell of Object.values(cells)) {
+    if (cell.isSecret || cell.isItemRoom) continue;
     const intended = intendedNeighbors(cells, cell.gx, cell.gy);
     const needed = requiredOpenWalls(intended);
     if (needed.length === 0) continue;
@@ -200,32 +215,114 @@ function ensureMinimumConnectivity(cells, rand) {
   }
 }
 
-export function generateDungeon(seed = Date.now()) {
+function branchCandidates(cells, excludeKeys, rand) {
+  return shuffle(
+    Object.values(cells).filter((cell) => {
+      const key = `${cell.gx},${cell.gy}`;
+      if (excludeKeys.has(key)) return false;
+      if (cell.isStart || cell.isBoss || cell.isItemRoom || cell.isSecret) return false;
+      return expandableDirections(cells, cell.gx, cell.gy, rand).length > 0;
+    }),
+    rand
+  );
+}
+
+function placeItemRoom(cells, rand, excludeKeys) {
+  const candidates = branchCandidates(cells, excludeKeys, rand).filter(
+    (c) => neighborCount(cells, c.gx, c.gy) >= 1
+  );
+
+  for (const parent of candidates) {
+    const options = expandableDirections(cells, parent.gx, parent.gy, rand);
+    if (!options.length) continue;
+    const pick = options[Math.floor(rand() * options.length)];
+    const key = `${pick.nx},${pick.ny}`;
+    cells[key] = {
+      gx: pick.nx,
+      gy: pick.ny,
+      isStart: false,
+      isItemRoom: true,
+      presetId: ITEM_ROOM_PRESET,
+    };
+    parent.itemDoorWall = pick.wall;
+    parent.goldenDoorWall = pick.wall;
+    parent.goldenDoorOpened = false;
+    return key;
+  }
+  return null;
+}
+
+function placeSecretRoom(cells, rand, excludeKeys) {
+  const candidates = branchCandidates(cells, excludeKeys, rand);
+
+  for (const parent of candidates) {
+    const options = expandableDirections(cells, parent.gx, parent.gy, rand);
+    for (const pick of options) {
+      let surrounded = 0;
+      for (const wall of DOOR_WALLS) {
+        const { dx, dy } = DIRECTIONS[wall];
+        const nx = pick.nx + dx;
+        const ny = pick.ny + dy;
+        if (nx < 0 || ny < 0 || nx >= FLOOR_GRID_SIZE || ny >= FLOOR_GRID_SIZE) {
+          surrounded++;
+          continue;
+        }
+        const otherKey = `${nx},${ny}`;
+        if (otherKey === `${parent.gx},${parent.gy}`) continue;
+        if (cells[otherKey]) surrounded++;
+      }
+      if (surrounded < 3) continue;
+
+      const key = `${pick.nx},${pick.ny}`;
+      const presetId = SECRET_PRESET_POOL[Math.floor(rand() * SECRET_PRESET_POOL.length)];
+      cells[key] = {
+        gx: pick.nx,
+        gy: pick.ny,
+        isStart: false,
+        isSecret: true,
+        secretRevealed: false,
+        presetId,
+      };
+      parent.secretLink = { gx: pick.nx, gy: pick.ny, wall: pick.wall };
+      return key;
+    }
+  }
+  return null;
+}
+
+export function generateDungeon(seed = Date.now(), floorNumber = 1) {
   const rand = mulberry32(seed);
   const cells = {};
   const startX = Math.floor(FLOOR_GRID_SIZE / 2);
   const startY = Math.floor(FLOOR_GRID_SIZE / 2);
   cells[`${startX},${startY}`] = { gx: startX, gy: startY, isStart: true };
 
-  const targetRooms = 8 + Math.floor(rand() * 8);
+  const targetRooms = 10 + Math.floor(rand() * 7);
 
   let attempts = 0;
-  while (Object.keys(cells).length < targetRooms && attempts < 500) {
+  while (Object.keys(cells).length < targetRooms && attempts < 600) {
     attempts++;
     const cell = pickExpansionCell(cells, rand);
     const options = expandableDirections(cells, cell.gx, cell.gy, rand);
     if (options.length === 0) continue;
-    const pick = options[0];
+    const pick = options[Math.floor(rand() * Math.min(2, options.length))];
     cells[`${pick.nx},${pick.ny}`] = { gx: pick.nx, gy: pick.ny, isStart: false };
   }
 
   const bossCell = pickBossCell(cells, startX, startY);
   const bossKey = `${bossCell.gx},${bossCell.gy}`;
-
   const startKey = `${startX},${startY}`;
+  const reserved = new Set([startKey, bossKey]);
+
+  const itemKey = placeItemRoom(cells, rand, reserved);
+  if (itemKey) reserved.add(itemKey);
+  placeSecretRoom(cells, rand, reserved);
 
   for (const cell of Object.values(cells)) {
     const key = `${cell.gx},${cell.gy}`;
+
+    if (cell.isItemRoom || cell.isSecret) continue;
+
     const required = requiredOpenWalls(intendedNeighbors(cells, cell.gx, cell.gy));
 
     if (key === startKey) {
@@ -246,34 +343,28 @@ export function generateDungeon(seed = Date.now()) {
   for (const cell of Object.values(cells)) {
     const doors = computeDoors(cell, cells, cell.presetId);
     const built = buildRoomFromPreset(cell.presetId, doors, rand);
-    if (!cell.poopStates) {
-      cell.poopStates = initPoopStates(built.grid);
-    }
-    if (!cell.destroyedRocks) {
-      cell.destroyedRocks = initDestroyedRocks(built.grid);
-    }
-    if (!cell.destroyedPots) {
-      cell.destroyedPots = initDestroyedPots(built.grid);
-    }
-    if (!cell.barrelStates) {
-      cell.barrelStates = initBarrelStates(built.grid);
-    }
-    if (!cell.campfireStates) {
-      cell.campfireStates = initCampfireStates(built.grid);
-    }
-    if (!cell.bombs) {
-      cell.bombs = [];
-    }
-    if (!cell.bloodTears) {
-      cell.bloodTears = [];
-    }
+    if (!cell.poopStates) cell.poopStates = initPoopStates(built.grid);
+    if (!cell.destroyedRocks) cell.destroyedRocks = initDestroyedRocks(built.grid);
+    if (!cell.destroyedPots) cell.destroyedPots = initDestroyedPots(built.grid);
+    if (!cell.barrelStates) cell.barrelStates = initBarrelStates(built.grid);
+    if (!cell.campfireStates) cell.campfireStates = initCampfireStates(built.grid);
+    if (!cell.keeperStates) cell.keeperStates = initKeeperStates(built.grid);
+    if (!cell.bombs) cell.bombs = [];
+    if (!cell.bloodTears) cell.bloodTears = [];
+    if (!cell.brokenDoors) cell.brokenDoors = createBrokenDoors();
+    if (!cell.floorSmears) cell.floorSmears = [];
+
     initCellPickups(cell, built);
     built.poopStates = cell.poopStates;
     built.destroyedRocks = cell.destroyedRocks;
     built.destroyedPots = cell.destroyedPots;
     built.barrelStates = cell.barrelStates;
     built.campfireStates = cell.campfireStates;
-    built.floorSmears = cell.floorSmears ?? [];
+    built.keeperStates = cell.keeperStates;
+    built.floorSmears = cell.floorSmears;
+    built.goldenDoorWall = cell.goldenDoorWall ?? null;
+    built.goldenDoorOpened = cell.goldenDoorOpened ?? false;
+
     rooms[`${cell.gx},${cell.gy}`] = {
       ...cell,
       doors,
@@ -282,6 +373,7 @@ export function generateDungeon(seed = Date.now()) {
       destroyedPots: cell.destroyedPots,
       barrelStates: cell.barrelStates,
       campfireStates: cell.campfireStates,
+      keeperStates: cell.keeperStates,
       bombs: cell.bombs,
       bloodTears: cell.bloodTears,
       pickups: cell.pickups,
@@ -289,22 +381,26 @@ export function generateDungeon(seed = Date.now()) {
       chest: cell.chest ?? null,
       room: built,
       doorsLocked: cell.doorsLocked ?? false,
-      brokenDoors: cell.brokenDoors ?? createBrokenDoors(),
+      brokenDoors: cell.brokenDoors,
       hadCombatEnemies: cell.hadCombatEnemies ?? false,
       clearRewardDropped: cell.clearRewardDropped ?? false,
-      floorSmears: cell.floorSmears ?? [],
+      floorSmears: cell.floorSmears,
+      floorNumber,
     };
   }
 
   const dungeon = {
     seed,
+    floorNumber,
     rooms,
     start: { gx: startX, gy: startY },
     boss: { gx: bossCell.gx, gy: bossCell.gy },
+    itemRoom: itemKey ? { gx: cells[itemKey].gx, gy: cells[itemKey].gy } : null,
     visited: new Set([`${startX},${startY}`]),
   };
 
   spawnChestsInDungeon(dungeon, rand);
+  spawnSecretRoomChests(dungeon, rand);
   spawnEnemiesInDungeon(dungeon, rand);
 
   for (const cell of Object.values(dungeon.rooms)) {
@@ -321,7 +417,7 @@ export function generateDungeon(seed = Date.now()) {
       }
       cell.bossIntroSeen = cell.bossIntroSeen ?? false;
       cell.bossDefeated = cell.bossDefeated ?? false;
-    } else if (!cell.floorSmears) {
+    } else if (!cell.floorSmears?.length) {
       cell.floorSmears = [];
       cell.room.floorSmears = cell.floorSmears;
     }
@@ -341,12 +437,24 @@ export function isBossDoor(dungeon, gx, gy, wall) {
   return Boolean(neighbor?.isBoss);
 }
 
+export function isItemDoor(dungeon, gx, gy, wall) {
+  const { dx, dy } = DIRECTIONS[wall];
+  const neighbor = getCurrentRoomData(dungeon, gx + dx, gy + dy);
+  return Boolean(neighbor?.isItemRoom);
+}
+
+export function isGoldenDoor(cell, wall) {
+  return cell?.goldenDoorWall === wall;
+}
+
 export function checkDoorTransition(player, room, gx, gy, dungeon) {
   const { width, height } = getPlayAreaSize();
   const chest = player.chestPosition?.() ?? { x: player.x, y: player.y };
   const r = player.bodyRadius ?? player.radius;
   const rDoor = r * 0.85;
   const cy = chest.y;
+  const cell = getCurrentRoomData(dungeon, gx, gy);
+  const floorNumber = dungeon.floorNumber ?? 1;
 
   const checks = [
     { wall: "north", test: cy - rDoor <= 0, nx: gx, ny: gy - 1, entry: "south" },
@@ -357,17 +465,27 @@ export function checkDoorTransition(player, room, gx, gy, dungeon) {
 
   for (const check of checks) {
     if (!room.doors[check.wall] || !check.test) continue;
-    if (!isDoorPassable(room, check.wall)) continue;
+    if (!isDoorPassable(room, check.wall, cell, floorNumber)) continue;
     if (!isInDoorGap(check.wall, chest.x, cy, width, height)) continue;
 
     const next = getCurrentRoomData(dungeon, check.nx, check.ny);
     if (!next) continue;
+
+    let usedKey = false;
+    if (isGoldenDoor(cell, check.wall) && floorNumber >= 2 && !cell.goldenDoorOpened) {
+      if (player.stats.keys <= 0) continue;
+      player.stats.keys -= 1;
+      cell.goldenDoorOpened = true;
+      room.goldenDoorOpened = true;
+      usedKey = true;
+    }
 
     return {
       gx: check.nx,
       gy: check.ny,
       entry: check.entry,
       room: next.room,
+      usedKey,
     };
   }
 
@@ -396,4 +514,27 @@ export function entryPosition(entryWall) {
 
 export function listRoomCells(dungeon) {
   return Object.values(dungeon.rooms);
+}
+
+export function revealSecretEntrance(dungeon, parentCell, wall) {
+  if (!parentCell?.secretLink || parentCell.secretRevealed) return false;
+  const secret = getCurrentRoomData(dungeon, parentCell.secretLink.gx, parentCell.secretLink.gy);
+  if (!secret) return false;
+
+  parentCell.secretRevealed = true;
+  parentCell.brokenDoors[wall] = true;
+  parentCell.doors[wall] = true;
+  parentCell.room.doors[wall] = true;
+  parentCell.room.doorLock.broken[wall] = true;
+
+  const opposite = DIRECTIONS[wall].opposite;
+  secret.secretRevealed = true;
+  secret.doors[opposite] = true;
+  secret.room.doors[opposite] = true;
+  secret.brokenDoors[opposite] = true;
+  secret.room.doorLock.broken[opposite] = true;
+
+  syncRoomDoorLock(parentCell.room, parentCell);
+  syncRoomDoorLock(secret.room, secret);
+  return true;
 }

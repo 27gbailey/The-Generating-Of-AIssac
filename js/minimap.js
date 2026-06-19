@@ -29,6 +29,8 @@ export function drawMinimap(ctx, canvas, dungeon, currentGx, currentGy) {
     let fill = "rgba(60, 50, 45, 0.35)";
     if (visited) fill = "rgba(90, 75, 60, 0.85)";
     if (cell.isBoss) fill = visited ? "rgba(120, 30, 30, 0.95)" : "rgba(90, 20, 20, 0.7)";
+    if (cell.isItemRoom) fill = visited ? "rgba(180, 150, 40, 0.95)" : "rgba(130, 100, 25, 0.75)";
+    if (cell.isSecret && visited) fill = "rgba(70, 55, 90, 0.9)";
     if (cell.isStart) fill = "rgba(120, 90, 70, 0.9)";
     if (isCurrent) fill = "rgba(180, 140, 90, 1)";
 

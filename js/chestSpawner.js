@@ -5,7 +5,7 @@ import {
   TILE,
   TILE_SIZE,
 } from "./constants.js";
-import { Chest } from "./chest.js";
+import { createGoldenChest, Chest } from "./chest.js";
 import { circleHitsRoom } from "./roomSpace.js";
 import { isPuzzlePreset, presetHasLayoutPickups } from "./roomPresets.js";
 
@@ -40,7 +40,9 @@ function findChestPosition(room, rand) {
 }
 
 export function spawnChestsInDungeon(dungeon, rand) {
-  const cells = Object.values(dungeon.rooms).filter((c) => !c.isStart && !c.isBoss);
+  const cells = Object.values(dungeon.rooms).filter(
+    (c) => !c.isStart && !c.isBoss && !c.isItemRoom && !c.isSecret
+  );
   const eligible = cells.filter(
     (c) =>
       isPuzzlePreset(c.presetId) &&
@@ -57,7 +59,18 @@ export function spawnChestsInDungeon(dungeon, rand) {
 
     const pos = findChestPosition(cell.room, rand);
     if (!pos) continue;
-    cell.chest = new Chest(pos.x, pos.y, rand);
+    const golden = rand() < 0.1;
+    cell.chest = golden ? createGoldenChest(pos.x, pos.y, rand) : new Chest(pos.x, pos.y, rand);
     placed++;
+  }
+}
+
+export function spawnSecretRoomChests(dungeon, rand) {
+  for (const cell of Object.values(dungeon.rooms)) {
+    if (!cell.isSecret || cell.chest) continue;
+    const pos = findChestPosition(cell.room, rand);
+    if (!pos) continue;
+    const golden = rand() < 0.38;
+    cell.chest = golden ? createGoldenChest(pos.x, pos.y, rand) : new Chest(pos.x, pos.y, rand);
   }
 }

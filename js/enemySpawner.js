@@ -111,7 +111,7 @@ function findSpawnPoint(room, spawnable, used, rand) {
 }
 
 export function spawnEnemiesForCell(cell, room, rand) {
-  if (cell.isStart || cell.isBoss) return [];
+  if (cell.isStart || cell.isBoss || cell.isItemRoom || cell.isSecret) return [];
   if (rand() > ROOM_ENEMY_CHANCE) return [];
 
   const spawnable = listSpawnableTiles(room);

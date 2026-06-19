@@ -10,6 +10,7 @@ import { isInDoorGap } from "./doors.js";
 import { isDoorBlocked } from "./doorLock.js";
 import { isBarrelSolid, barrelHitbox } from "./barrel.js";
 import { isBlueRockSolid, isPotSolid, isRockSolid } from "./destructibles.js";
+import { isKeeperSolid } from "./keeper.js";
 import { findPoopHit, isPoopSolid, poopHitbox } from "./poop.js";
 import { circleIntersectsObjectHitbox, objectHitbox } from "./objectHitbox.js";
 import { BODY_RADIUS, CHEST_OFFSET_Y } from "./constants.js";

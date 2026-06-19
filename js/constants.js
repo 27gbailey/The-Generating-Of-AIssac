@@ -19,6 +19,7 @@ export const TILE = {
   RED_CAMPFIRE: "07",
   POT: "08",
   BLUE_ROCK: "09",
+  KEEPER: "10",
 };
 
 export const DOOR_WALLS = ["north", "east", "south", "west"];
@@ -100,6 +101,15 @@ export const DOOR_CLEARANCE = {
 export const BLOCKING_TILES = new Set([
   TILE.ROCK, TILE.BLUE_ROCK, TILE.WALL, TILE.POOP, TILE.BARREL, TILE.POT,
 ]);
+
+export const ITEM_ROOM_PRESET = "item_room";
+export const SECRET_PRESET_POOL = [
+  "secret_hoard",
+  "secret_shrine",
+  "secret_nest",
+  "secret_vault",
+  "secret_keeper_hall",
+];
 
 /** Chance for a rock tile to become a blue rock when rooms are built. */
 export const BLUE_ROCK_REPLACE_CHANCE = 0.06;
