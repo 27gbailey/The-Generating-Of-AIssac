@@ -128,7 +128,20 @@ function drawWallInnerShadow(ctx, x, y, w, h, horizontal, wallSide) {
   }
 }
 
-function drawDoor(ctx, originX, originY, segment, wall, locked = false, broken = false, golden = false, floorNumber = 1, goldenOpened = false) {
+function drawDoor(
+  ctx,
+  originX,
+  originY,
+  segment,
+  wall,
+  locked = false,
+  broken = false,
+  golden = false,
+  floorNumber = 1,
+  goldenOpened = false,
+  boss = false,
+  time = 0
+) {
   const x = originX + segment.x;
   const y = originY + segment.y;
 
@@ -146,6 +159,43 @@ function drawDoor(ctx, originX, originY, segment, wall, locked = false, broken =
     ctx.moveTo(x + segment.w - 4, y + 4);
     ctx.lineTo(x + 4, y + segment.h - 4);
     ctx.stroke();
+    return;
+  }
+
+  if (boss) {
+    const openGlow = !locked;
+    if (openGlow) {
+      const pulse = 0.55 + Math.sin(time * 3.2) * 0.25;
+      ctx.save();
+      ctx.shadowColor = "#cc2020";
+      ctx.shadowBlur = 14 + Math.sin(time * 4) * 6;
+      ctx.fillStyle = `rgba(180, 30, 30, ${0.22 * pulse})`;
+      ctx.fillRect(x - 4, y - 4, segment.w + 8, segment.h + 8);
+      ctx.restore();
+    }
+
+    ctx.fillStyle = "#5a5a5a";
+    ctx.fillRect(x, y, segment.w, segment.h);
+    ctx.strokeStyle = "#2a2a2a";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x + 1, y + 1, segment.w - 2, segment.h - 2);
+
+    ctx.fillStyle = openGlow ? "#e8e8e8" : "#bdbdbd";
+    ctx.font = "bold 13px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("☠", x + segment.w / 2, y + segment.h / 2 + 1);
+
+    if (openGlow) {
+      ctx.strokeStyle = `rgba(220, 40, 40, ${0.35 + pulse * 0.35})`;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(x + 2, y + 2, segment.w - 4, segment.h - 4);
+    }
+
+    if (locked) {
+      ctx.fillStyle = "rgba(40, 10, 10, 0.55)";
+      ctx.fillRect(x + 2, y + 2, segment.w - 4, segment.h - 4);
+    }
     return;
   }
 
@@ -203,7 +253,13 @@ function drawDoor(ctx, originX, originY, segment, wall, locked = false, broken =
 }
 
 function drawWalls(ctx, originX, originY, width, height, room, options = {}) {
-  const { isBoss = false, isItemRoom = false, floorNumber = 1 } = options;
+  const {
+    isBoss = false,
+    isItemRoom = false,
+    floorNumber = 1,
+    bossDoorWalls = {},
+    time = 0,
+  } = options;
   textureBand(ctx, originX, originY, width, WALL_THICKNESS, true, "north");
   textureBand(
     ctx,
@@ -258,7 +314,9 @@ function drawWalls(ctx, originX, originY, width, height, room, options = {}) {
       broken,
       golden,
       floorNumber,
-      room.goldenDoorOpened
+      room.goldenDoorOpened,
+      bossDoorWalls[wall],
+      time
     );
   }
 }
@@ -340,6 +398,8 @@ export function drawRoom(ctx, room, offsetX, offsetY, options = {}) {
     isBoss: options.isBoss,
     isItemRoom: options.isItemRoom,
     floorNumber: options.floorNumber ?? room.floorNumber ?? 1,
+    bossDoorWalls: options.bossDoorWalls ?? {},
+    time: options.time ?? 0,
   });
 
   if (options.cellKey && options.dungeonSeed != null) {

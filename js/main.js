@@ -1,3 +1,4 @@
+import { DOOR_WALLS } from "./constants.js";
 import { getRoomCatalogEntry } from "./rooms.js";
 import { drawRoom, roomPixelSize, tickRoomAmbience } from "./render.js";
 import { getRoomScreenLayout, getSpawnPosition } from "./roomSpace.js";
@@ -14,6 +15,7 @@ import {
   entryPosition,
   isBossDoor,
   isItemDoor,
+  isBossDoor,
   revealSecretEntrance,
 } from "./dungeon.js";
 import { drawMinimap } from "./minimap.js";
@@ -256,6 +258,10 @@ function updateHud() {
 
 function roomDrawOptions(gx, gy) {
   const cell = getCurrentRoomData(game.dungeon, gx, gy);
+  const bossDoorWalls = {};
+  for (const wall of DOOR_WALLS) {
+    bossDoorWalls[wall] = isBossDoor(game.dungeon, gx, gy, wall);
+  }
   return {
     cellKey: `${gx},${gy}`,
     dungeonSeed: game.dungeon.seed,
@@ -263,6 +269,7 @@ function roomDrawOptions(gx, gy) {
     isItemRoom: cell?.isItemRoom ?? false,
     floorNumber: game.dungeon.floorNumber ?? game.floorNumber ?? 1,
     time: game.worldTime,
+    bossDoorWalls,
   };
 }
 

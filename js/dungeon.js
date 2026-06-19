@@ -80,14 +80,14 @@ function pickExpansionCell(cells, rand) {
     return count >= 2 && count < 4 && expandableDirections(cells, cell.gx, cell.gy, rand).length > 0;
   });
 
-  if (branchPoints.length > 0 && (deadEnds.length === 0 || rand() < 0.62)) {
+  if (branchPoints.length > 0 && (deadEnds.length === 0 || rand() < 0.88)) {
     branchPoints.sort(
       (a, b) => neighborCount(cells, b.gx, b.gy) - neighborCount(cells, a.gx, a.gy)
     );
-    const top = branchPoints.slice(0, Math.min(4, branchPoints.length));
+    const top = branchPoints.slice(0, Math.min(5, branchPoints.length));
     return top[Math.floor(rand() * top.length)];
   }
-  if (deadEnds.length > 0 && rand() < 0.34) {
+  if (deadEnds.length > 0 && rand() < 0.1) {
     return deadEnds[Math.floor(rand() * deadEnds.length)];
   }
   if (branchPoints.length > 0) {
@@ -128,36 +128,96 @@ function bfsDistance(cells, sx, sy, tx, ty) {
   return 0;
 }
 
+function entranceWallOnBoss(boss, neighbor) {
+  if (neighbor.gx > boss.gx) return "west";
+  if (neighbor.gx < boss.gx) return "east";
+  if (neighbor.gy > boss.gy) return "north";
+  return "south";
+}
+
+function bossSupportsEntrance(boss, neighbor) {
+  const wall = entranceWallOnBoss(boss, neighbor);
+  const blocked = getBlockedWalls(presetGrid(BOSS_PRESET));
+  return !blocked[wall];
+}
+
 function pickBossCell(cells, startX, startY) {
-  const queue = [{ gx: startX, gy: startY, dist: 0 }];
-  const visited = new Set([`${startX},${startY}`]);
-  let farthest = { gx: startX, gy: startY, dist: 0 };
-
-  while (queue.length > 0) {
-    const current = queue.shift();
-    if (current.dist > farthest.dist) farthest = current;
-
-    for (const wall of DOOR_WALLS) {
-      const { dx, dy } = DIRECTIONS[wall];
-      const key = `${current.gx + dx},${current.gy + dy}`;
-      if (!cells[key] || visited.has(key)) continue;
-      visited.add(key);
-      queue.push({ gx: current.gx + dx, gy: current.gy + dy, dist: current.dist + 1 });
-    }
-  }
-
-  const deadEnds = Object.values(cells).filter(
-    (cell) => neighborCount(cells, cell.gx, cell.gy) === 1
-  );
-  const farDeadEnds = deadEnds.filter((cell) => {
-    const dist = bfsDistance(cells, startX, startY, cell.gx, cell.gy);
-    return dist >= Math.max(2, farthest.dist - 1);
+  const deadEnds = Object.values(cells).filter((cell) => {
+    if (cell.isStart) return false;
+    if (neighborCount(cells, cell.gx, cell.gy) !== 1) return false;
+    const neighborKey = bossNeighborKeys(cells, `${cell.gx},${cell.gy}`)[0];
+    const neighbor = cells[neighborKey];
+    return neighbor && bossSupportsEntrance(cell, neighbor);
   });
 
-  if (farDeadEnds.length > 0) {
-    return farDeadEnds[Math.floor(farDeadEnds.length / 2)];
+  if (deadEnds.length > 0) {
+    deadEnds.sort(
+      (a, b) =>
+        bfsDistance(cells, startX, startY, b.gx, b.gy) -
+        bfsDistance(cells, startX, startY, a.gx, a.gy)
+    );
+    return deadEnds[0];
   }
-  return farthest;
+
+  const fallback = Object.values(cells).filter((cell) => {
+    if (cell.isStart) return false;
+    if (neighborCount(cells, cell.gx, cell.gy) !== 1) return false;
+    return true;
+  });
+  if (fallback.length > 0) {
+    fallback.sort(
+      (a, b) =>
+        bfsDistance(cells, startX, startY, b.gx, b.gy) -
+        bfsDistance(cells, startX, startY, a.gx, a.gy)
+    );
+    return fallback[0];
+  }
+
+  let farthest = null;
+  let bestDist = -1;
+  for (const cell of Object.values(cells)) {
+    if (cell.isStart) continue;
+    const dist = bfsDistance(cells, startX, startY, cell.gx, cell.gy);
+    if (dist > bestDist) {
+      bestDist = dist;
+      farthest = cell;
+    }
+  }
+  return farthest ?? { gx: startX, gy: startY };
+}
+
+function bossNeighborKeys(cells, bossKey) {
+  const boss = cells[bossKey];
+  if (!boss) return [];
+  return DOOR_WALLS.map((wall) => {
+    const { dx, dy } = DIRECTIONS[wall];
+    const key = `${boss.gx + dx},${boss.gy + dy}`;
+    return cells[key] ? key : null;
+  }).filter(Boolean);
+}
+
+/** Boss rooms must have exactly one connecting neighbor (single entrance). */
+function enforceBossSingleEntrance(cells, bossKey, startKey) {
+  const neighbors = bossNeighborKeys(cells, bossKey);
+  if (neighbors.length <= 1) return;
+
+  neighbors.sort((a, b) => {
+    const ca = cells[a];
+    const cb = cells[b];
+    return (
+      bfsDistance(cells, cells[startKey].gx, cells[startKey].gy, ca.gx, ca.gy) -
+      bfsDistance(cells, cells[startKey].gx, cells[startKey].gy, cb.gx, cb.gy)
+    );
+  });
+
+  for (let i = 1; i < neighbors.length; i++) {
+    const key = neighbors[i];
+    const cell = cells[key];
+    if (!cell || cell.isStart || cell.isItemRoom || cell.isSecret || cell.isBoss) continue;
+    if (neighborCount(cells, cell.gx, cell.gy) === 1) {
+      delete cells[key];
+    }
+  }
 }
 
 function presetGrid(presetId) {
@@ -224,7 +284,7 @@ function ensureMinimumConnectivity(cells, rand) {
       for (const wall of DOOR_WALLS) {
         const { dx, dy } = DIRECTIONS[wall];
         const neighbor = cells[`${cell.gx + dx},${cell.gy + dy}`];
-        if (!neighbor || neighbor.isSecret || neighbor.isItemRoom || neighbor.isBoss) continue;
+        if (!neighbor || neighbor.isSecret || neighbor.isItemRoom) continue;
 
         if (
           bothSidesBlockSharedWall(
@@ -236,7 +296,11 @@ function ensureMinimumConnectivity(cells, rand) {
           const neighborNeeded = requiredOpenWalls(
             intendedNeighbors(cells, neighbor.gx, neighbor.gy)
           );
-          neighbor.presetId = pickPresetForCell(rand, neighborNeeded);
+          if (!neighbor.isBoss) {
+            neighbor.presetId = pickPresetForCell(rand, neighborNeeded);
+          } else if (!cell.isBoss && !cell.isStart) {
+            cell.presetId = pickPresetForCell(rand, requiredOpenWalls(intended));
+          }
           changed = true;
         }
       }
@@ -277,13 +341,38 @@ function branchCandidates(cells, excludeKeys, rand) {
   );
 }
 
-function placeItemRoom(cells, rand, excludeKeys) {
+function isAdjacentToBoss(cells, nx, ny, bossKey) {
+  const boss = cells[bossKey];
+  if (!boss) return false;
+  return Math.abs(nx - boss.gx) + Math.abs(ny - boss.gy) === 1;
+}
+
+function countSurroundedSides(cells, parent, nx, ny) {
+  let surrounded = 0;
+  for (const wall of DOOR_WALLS) {
+    const { dx, dy } = DIRECTIONS[wall];
+    const sx = nx + dx;
+    const sy = ny + dy;
+    if (sx < 0 || sy < 0 || sx >= FLOOR_GRID_SIZE || sy >= FLOOR_GRID_SIZE) {
+      surrounded++;
+      continue;
+    }
+    const otherKey = `${sx},${sy}`;
+    if (otherKey === `${parent.gx},${parent.gy}`) continue;
+    if (cells[otherKey]) surrounded++;
+  }
+  return surrounded;
+}
+
+function placeItemRoom(cells, rand, excludeKeys, bossKey) {
   const candidates = branchCandidates(cells, excludeKeys, rand).filter(
     (c) => neighborCount(cells, c.gx, c.gy) >= 1
   );
 
   for (const parent of candidates) {
-    const options = expandableDirections(cells, parent.gx, parent.gy, rand);
+    const options = expandableDirections(cells, parent.gx, parent.gy, rand).filter(
+      (pick) => !isAdjacentToBoss(cells, pick.nx, pick.ny, bossKey)
+    );
     if (!options.length) continue;
     const pick = options[Math.floor(rand() * options.length)];
     const key = `${pick.nx},${pick.ny}`;
@@ -302,26 +391,60 @@ function placeItemRoom(cells, rand, excludeKeys) {
   return null;
 }
 
-function placeSecretRoom(cells, rand, excludeKeys) {
+function forcePlaceItemRoom(cells, rand, excludeKeys, bossKey, startKey) {
+  let key = placeItemRoom(cells, rand, excludeKeys, bossKey);
+  if (key) return key;
+
+  const tryParents = shuffle(Object.values(cells), rand);
+  for (const parent of tryParents) {
+    const parentKey = `${parent.gx},${parent.gy}`;
+    if (excludeKeys.has(parentKey) || parent.isBoss || parent.isSecret) continue;
+    for (const pick of expandableDirections(cells, parent.gx, parent.gy, rand)) {
+      if (excludeKeys.has(`${pick.nx},${pick.ny}`)) continue;
+      if (isAdjacentToBoss(cells, pick.nx, pick.ny, bossKey)) continue;
+      const newKey = `${pick.nx},${pick.ny}`;
+      cells[newKey] = {
+        gx: pick.nx,
+        gy: pick.ny,
+        isStart: false,
+        isItemRoom: true,
+        presetId: ITEM_ROOM_PRESET,
+      };
+      parent.itemDoorWall = pick.wall;
+      parent.goldenDoorWall = pick.wall;
+      parent.goldenDoorOpened = false;
+      return newKey;
+    }
+  }
+
+  const start = cells[startKey];
+  for (const pick of expandableDirections(cells, start.gx, start.gy, rand)) {
+    if (isAdjacentToBoss(cells, pick.nx, pick.ny, bossKey)) continue;
+    const newKey = `${pick.nx},${pick.ny}`;
+    cells[newKey] = {
+      gx: pick.nx,
+      gy: pick.ny,
+      isStart: false,
+      isItemRoom: true,
+      presetId: ITEM_ROOM_PRESET,
+    };
+    start.itemDoorWall = pick.wall;
+    start.goldenDoorWall = pick.wall;
+    start.goldenDoorOpened = false;
+    return newKey;
+  }
+  return null;
+}
+
+function placeSecretRoom(cells, rand, excludeKeys, bossKey, minSurrounded = 3) {
   const candidates = branchCandidates(cells, excludeKeys, rand);
 
   for (const parent of candidates) {
-    const options = expandableDirections(cells, parent.gx, parent.gy, rand);
+    const options = expandableDirections(cells, parent.gx, parent.gy, rand).filter(
+      (pick) => !isAdjacentToBoss(cells, pick.nx, pick.ny, bossKey)
+    );
     for (const pick of options) {
-      let surrounded = 0;
-      for (const wall of DOOR_WALLS) {
-        const { dx, dy } = DIRECTIONS[wall];
-        const nx = pick.nx + dx;
-        const ny = pick.ny + dy;
-        if (nx < 0 || ny < 0 || nx >= FLOOR_GRID_SIZE || ny >= FLOOR_GRID_SIZE) {
-          surrounded++;
-          continue;
-        }
-        const otherKey = `${nx},${ny}`;
-        if (otherKey === `${parent.gx},${parent.gy}`) continue;
-        if (cells[otherKey]) surrounded++;
-      }
-      if (surrounded < 3) continue;
+      if (countSurroundedSides(cells, parent, pick.nx, pick.ny) < minSurrounded) continue;
 
       const key = `${pick.nx},${pick.ny}`;
       const presetId = SECRET_PRESET_POOL[Math.floor(rand() * SECRET_PRESET_POOL.length)];
@@ -340,11 +463,66 @@ function placeSecretRoom(cells, rand, excludeKeys) {
   return null;
 }
 
-export function generateDungeon(seed = Date.now(), floorNumber = 1) {
-  const rand = mulberry32(seed);
+function forcePlaceSecretRoom(cells, rand, excludeKeys, bossKey) {
+  for (const minSurrounded of [3, 2, 1]) {
+    const key = placeSecretRoom(cells, rand, excludeKeys, bossKey, minSurrounded);
+    if (key) return key;
+  }
+
+  const tryParents = shuffle(Object.values(cells), rand);
+  for (const parent of tryParents) {
+    const parentKey = `${parent.gx},${parent.gy}`;
+    if (excludeKeys.has(parentKey) || parent.isBoss || parent.isItemRoom) continue;
+    for (const pick of expandableDirections(cells, parent.gx, parent.gy, rand)) {
+      if (excludeKeys.has(`${pick.nx},${pick.ny}`)) continue;
+      if (isAdjacentToBoss(cells, pick.nx, pick.ny, bossKey)) continue;
+      const key = `${pick.nx},${pick.ny}`;
+      const presetId = SECRET_PRESET_POOL[Math.floor(rand() * SECRET_PRESET_POOL.length)];
+      cells[key] = {
+        gx: pick.nx,
+        gy: pick.ny,
+        isStart: false,
+        isSecret: true,
+        secretRevealed: false,
+        presetId,
+      };
+      parent.secretLink = { gx: pick.nx, gy: pick.ny, wall: pick.wall };
+      return key;
+    }
+  }
+  return null;
+}
+
+function ensureBossEntrance(cells, bossKey, rand) {
+  const neighbors = bossNeighborKeys(cells, bossKey);
+  if (neighbors.length !== 1) return;
+  const boss = cells[bossKey];
+  const neighbor = cells[neighbors[0]];
+  const entranceWall = entranceWallOnBoss(boss, neighbor);
+  const blocked = getBlockedWalls(presetGrid(boss.presetId ?? BOSS_PRESET));
+  if (!blocked[entranceWall]) return;
+
+  const neighborNeeded = requiredOpenWalls(intendedNeighbors(cells, neighbor.gx, neighbor.gy));
+  if (!neighbor.isStart) {
+    neighbor.presetId = pickPresetForCell(rand, neighborNeeded);
+  }
+}
+
+function validateFloorGraph(cells, startKey, bossKey, itemKey, secretKey) {
+  if (!cells[startKey] || !cells[bossKey] || !itemKey || !secretKey) return false;
+  if (!cells[itemKey]?.isItemRoom || !cells[secretKey]?.isSecret) return false;
+  if (bossNeighborKeys(cells, bossKey).length !== 1) return false;
+
+  const boss = cells[bossKey];
+  const bossNeighbors = bossNeighborKeys(cells, bossKey);
+  const neighbor = cells[bossNeighbors[0]];
+  if (!neighbor || !bossSupportsEntrance(boss, neighbor)) return false;
+
+  return true;
+}
+
+function buildCellGraph(rand, startX, startY) {
   const cells = {};
-  const startX = Math.floor(FLOOR_GRID_SIZE / 2);
-  const startY = Math.floor(FLOOR_GRID_SIZE / 2);
   cells[`${startX},${startY}`] = { gx: startX, gy: startY, isStart: true };
 
   const targetRooms = 10 + Math.floor(rand() * 7);
@@ -355,18 +533,26 @@ export function generateDungeon(seed = Date.now(), floorNumber = 1) {
     const cell = pickExpansionCell(cells, rand);
     const options = expandableDirections(cells, cell.gx, cell.gy, rand);
     if (options.length === 0) continue;
-    const pick = options[Math.floor(rand() * Math.min(2, options.length))];
+    const pick = options[Math.floor(rand() * options.length)];
     cells[`${pick.nx},${pick.ny}`] = { gx: pick.nx, gy: pick.ny, isStart: false };
   }
 
-  const bossCell = pickBossCell(cells, startX, startY);
-  const bossKey = `${bossCell.gx},${bossCell.gy}`;
+  let bossCell = pickBossCell(cells, startX, startY);
+  let bossKey = `${bossCell.gx},${bossCell.gy}`;
   const startKey = `${startX},${startY}`;
+
+  enforceBossSingleEntrance(cells, bossKey, startKey);
+  bossCell = cells[bossKey] ?? bossCell;
+  bossKey = `${bossCell.gx},${bossCell.gy}`;
+
   const reserved = new Set([startKey, bossKey]);
 
-  const itemKey = placeItemRoom(cells, rand, reserved);
-  if (itemKey) reserved.add(itemKey);
-  placeSecretRoom(cells, rand, reserved);
+  const itemKey = forcePlaceItemRoom(cells, rand, reserved, bossKey, startKey);
+  if (!itemKey) return null;
+  reserved.add(itemKey);
+
+  const secretKey = forcePlaceSecretRoom(cells, rand, reserved, bossKey);
+  if (!secretKey) return null;
 
   for (const cell of Object.values(cells)) {
     const key = `${cell.gx},${cell.gy}`;
@@ -388,6 +574,30 @@ export function generateDungeon(seed = Date.now(), floorNumber = 1) {
   }
 
   ensureMinimumConnectivity(cells, rand);
+  ensureBossEntrance(cells, bossKey, rand);
+  ensureMinimumConnectivity(cells, rand);
+
+  if (!validateFloorGraph(cells, startKey, bossKey, itemKey, secretKey)) return null;
+
+  return { cells, startKey, bossKey, itemKey, secretKey, bossCell };
+}
+
+export function generateDungeon(seed = Date.now(), floorNumber = 1) {
+  let graph = null;
+  for (let attempt = 0; attempt < 40; attempt++) {
+    const rand = mulberry32(seed + attempt * 7919);
+    graph = buildCellGraph(rand, Math.floor(FLOOR_GRID_SIZE / 2), Math.floor(FLOOR_GRID_SIZE / 2));
+    if (graph) break;
+  }
+
+  if (!graph) {
+    throw new Error("Failed to generate a valid dungeon layout.");
+  }
+
+  const { cells, startKey, bossKey, itemKey, secretKey, bossCell } = graph;
+  const startX = cells[startKey].gx;
+  const startY = cells[startKey].gy;
+  const rand = mulberry32(seed);
 
   const rooms = {};
   for (const cell of Object.values(cells)) {
@@ -445,7 +655,8 @@ export function generateDungeon(seed = Date.now(), floorNumber = 1) {
     rooms,
     start: { gx: startX, gy: startY },
     boss: { gx: bossCell.gx, gy: bossCell.gy },
-    itemRoom: itemKey ? { gx: cells[itemKey].gx, gy: cells[itemKey].gy } : null,
+    itemRoom: { gx: cells[itemKey].gx, gy: cells[itemKey].gy },
+    secretRoom: { gx: cells[secretKey].gx, gy: cells[secretKey].gy },
     visited: new Set([`${startX},${startY}`]),
   };
 

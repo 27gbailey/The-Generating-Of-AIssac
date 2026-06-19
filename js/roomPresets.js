@@ -548,7 +548,7 @@ const PRESET_LAYOUTS = {
   boss_chamber: {
     rocks: [[4, 2], [8, 2], [4, 4], [8, 4]],
     poops: [[3, 3], [9, 3]],
-    redCampfires: [[0, 2], [12, 2], [2, 0], [10, 0]],
+    redCampfires: [[1, 3], [11, 3], [3, 1], [9, 1], [3, 5], [9, 5]],
     skipPerimeter: true,
   },
 
