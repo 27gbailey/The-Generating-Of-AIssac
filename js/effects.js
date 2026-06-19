@@ -322,3 +322,61 @@ export class BossDeathBurst {
     return this.life <= 0;
   }
 }
+
+export class SmokePuff {
+  constructor(x, y) {
+    this.x = x;
+    this.y = y;
+    this.life = 0.62;
+    this.maxLife = 0.62;
+    this.puffs = [];
+
+    for (let i = 0; i < 10; i++) {
+      this.puffs.push({
+        x: (Math.random() - 0.5) * 10,
+        y: (Math.random() - 0.5) * 8,
+        vx: (Math.random() - 0.5) * 28,
+        vy: -24 - Math.random() * 48,
+        radius: 6 + Math.random() * 14,
+      });
+    }
+  }
+
+  update(dt) {
+    this.life -= dt;
+    for (const p of this.puffs) {
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.vy -= 18 * dt;
+      p.radius += dt * 22;
+    }
+  }
+
+  draw(ctx, layout) {
+    if (this.life <= 0) return;
+
+    const baseX = layout.floorX + this.x;
+    const baseY = layout.floorY + this.y;
+    const alpha = this.life / this.maxLife;
+
+    ctx.save();
+    for (const p of this.puffs) {
+      ctx.globalAlpha = alpha * 0.55;
+      ctx.fillStyle = "#8a8a82";
+      ctx.beginPath();
+      ctx.arc(baseX + p.x, baseY + p.y, p.radius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.globalAlpha = alpha * 0.35;
+    ctx.fillStyle = "#b8b8b0";
+    ctx.beginPath();
+    ctx.arc(baseX, baseY - 6, 16 + (1 - alpha) * 10, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  get dead() {
+    return this.life <= 0;
+  }
+}

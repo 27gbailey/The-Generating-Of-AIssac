@@ -17,6 +17,7 @@ import {
   drawRoomAmbience,
   updateRoomAmbience,
 } from "./roomAmbience.js";
+import { drawFloorSmears } from "./floorSmears.js";
 
 const TILE_COLORS = {
   [TILE.FLOOR]: "#8f8170",
@@ -246,6 +247,8 @@ export function drawRoom(ctx, room, offsetX, offsetY, options = {}) {
       drawFloorTile(ctx, px, py);
     }
   }
+
+  drawFloorSmears(ctx, { floorX, floorY }, room.floorSmears ?? []);
 
   for (let y = 0; y < ROOM_HEIGHT; y++) {
     for (let x = 0; x < ROOM_WIDTH; x++) {

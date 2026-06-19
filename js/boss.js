@@ -12,19 +12,69 @@ const BOSS_SPEED = 68;
 const SHOOT_COOLDOWN = 2.2;
 const LUNGE_COOLDOWN = 5.5;
 
+/** Per-boss room layout, spawn point, and trapdoor placement. */
+export const BOSS_DEFINITIONS = {
+  wailer: {
+    key: "wailer",
+    name: BOSS_NAME,
+    presetId: "wailer_chamber",
+    hp: BOSS_HP,
+    radius: BOSS_RADIUS,
+    roomLayout: {
+      rocks: [[4, 2], [8, 2], [4, 4], [8, 4]],
+      poops: [[3, 3], [9, 3]],
+      redCampfires: [[0, 2], [12, 2], [2, 0], [10, 0]],
+      skipPerimeter: true,
+    },
+    spawn: { tx: 6.5, ty: 3.8 },
+    trapdoor: { tx: 6, ty: 2 },
+    floorBloodCount: 36,
+  },
+};
+
+export const ACTIVE_BOSS_KEY = "wailer";
+
+export function getActiveBossDefinition() {
+  return BOSS_DEFINITIONS[ACTIVE_BOSS_KEY];
+}
+
+export function getBossRoomLayouts() {
+  const layouts = {};
+  for (const def of Object.values(BOSS_DEFINITIONS)) {
+    layouts[def.presetId] = def.roomLayout;
+  }
+  return layouts;
+}
+
+export function getBossPresetIds() {
+  return Object.values(BOSS_DEFINITIONS).map((def) => def.presetId);
+}
+
+export function getBossSpawnPosition(def = getActiveBossDefinition()) {
+  return {
+    x: def.spawn.tx * TILE_SIZE,
+    y: def.spawn.ty * TILE_SIZE,
+  };
+}
+
+export function getBossTrapdoorTile(def = getActiveBossDefinition()) {
+  return def.trapdoor;
+}
+
 export function createBoss(x, y) {
   return new Boss(x, y);
 }
 
 export class Boss {
   constructor(x, y) {
-    this.name = BOSS_NAME;
+    const def = getActiveBossDefinition();
+    this.name = def.name;
     this.x = x;
     this.y = y;
-    this.hp = BOSS_HP;
-    this.maxHp = BOSS_HP;
+    this.hp = def.hp;
+    this.maxHp = def.hp;
     this.alive = true;
-    this.radius = BOSS_RADIUS;
+    this.radius = def.radius;
     this.shootTimer = 1.2;
     this.lungeTimer = 3;
     this.lungeVx = 0;
@@ -159,25 +209,6 @@ export class Boss {
     ctx.arc(sx, sy + 8 + pulse, 18, 0.15 * Math.PI, 0.85 * Math.PI);
     ctx.stroke();
 
-    ctx.restore();
-  }
-
-  drawIntroSilhouette(ctx, x, y, scale = 1) {
-    ctx.save();
-    ctx.translate(x, y);
-    ctx.scale(scale, scale);
-    ctx.fillStyle = "#4a1820";
-    ctx.strokeStyle = "#1a0808";
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.ellipse(0, 0, 52, 42, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-    ctx.fillStyle = "#cc2020";
-    ctx.beginPath();
-    ctx.arc(-18, -8, 5, 0, Math.PI * 2);
-    ctx.arc(18, -8, 5, 0, Math.PI * 2);
-    ctx.fill();
     ctx.restore();
   }
 }

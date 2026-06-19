@@ -74,6 +74,7 @@ export function explosionTileBounds(cx, cy, radiusX = EXPLOSION_RADIUS_X, radius
 export function destroyObjectsInExplosion(room, cx, cy, radiusX = EXPLOSION_RADIUS_X, radiusY = EXPLOSION_RADIUS_Y, rand = Math.random) {
   const { minTx, maxTx, minTy, maxTy } = explosionTileBounds(cx, cy, radiusX, radiusY);
   const spawnedPickups = [];
+  const smokePoints = [];
 
   for (let ty = minTy; ty <= maxTy; ty++) {
     for (let tx = minTx; tx <= maxTx; tx++) {
@@ -94,12 +95,15 @@ export function destroyObjectsInExplosion(room, cx, cy, radiusX = EXPLOSION_RADI
       } else if (code === TILE.BARREL && isBarrelSolid(room, tx, ty)) {
         destroyBarrelInstant(room, tx, ty);
       } else if (code === TILE.CAMPFIRE || code === TILE.RED_CAMPFIRE) {
-        extinguishCampfireInExplosion(room, tx, ty);
+        if (extinguishCampfireInExplosion(room, tx, ty)) {
+          const center = tileCenter(tx, ty);
+          smokePoints.push({ x: center.x, y: center.y });
+        }
       }
     }
   }
 
-  return spawnedPickups;
+  return { pickups: spawnedPickups, smokePoints };
 }
 
 export function findBarrelsInExplosion(room, cx, cy, radiusX = EXPLOSION_RADIUS_X, radiusY = EXPLOSION_RADIUS_Y) {
@@ -167,6 +171,7 @@ export function resolveExplosionChain(room, originX, originY, bombs, player, onB
   const queue = [{ x: originX, y: originY }];
   const seen = new Set();
   const allPickups = [];
+  const allSmoke = [];
 
   while (queue.length > 0) {
     const { x, y } = queue.shift();
@@ -175,8 +180,16 @@ export function resolveExplosionChain(room, originX, originY, bombs, player, onB
     seen.add(key);
 
     const chains = collectChainDetonations(room, x, y, bombs);
-    const drops = destroyObjectsInExplosion(room, x, y, EXPLOSION_RADIUS_X, EXPLOSION_RADIUS_Y, rand);
-    allPickups.push(...drops);
+    const { pickups, smokePoints } = destroyObjectsInExplosion(
+      room,
+      x,
+      y,
+      EXPLOSION_RADIUS_X,
+      EXPLOSION_RADIUS_Y,
+      rand
+    );
+    allPickups.push(...pickups);
+    allSmoke.push(...smokePoints);
     applyExplosionKnockback(player, x, y);
     applyExplosionDamage(player, x, y);
     onBurst(x, y);
@@ -186,5 +199,5 @@ export function resolveExplosionChain(room, originX, originY, bombs, player, onB
     }
   }
 
-  return allPickups;
+  return { pickups: allPickups, smokePoints: allSmoke };
 }

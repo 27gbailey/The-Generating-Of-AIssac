@@ -351,17 +351,20 @@ export function checkEnemyContact(player, enemies) {
 }
 
 export function damageEnemiesInExplosion(enemies, cx, cy, radiusX, radiusY, damage) {
-  let hitAny = false;
+  const kills = [];
   for (const enemy of enemies) {
     if (!enemy.alive) continue;
     const dx = (enemy.x - cx) / radiusX;
     const dy = (enemy.y - cy) / radiusY;
     if (dx * dx + dy * dy <= 1) {
+      const wasAlive = enemy.alive;
       enemy.takeDamage(damage);
-      hitAny = true;
+      if (wasAlive && !enemy.alive) {
+        kills.push({ x: enemy.x, y: enemy.y });
+      }
     }
   }
-  return hitAny;
+  return kills;
 }
 
 export function findEnemyHit(cx, cy, radius, enemies) {

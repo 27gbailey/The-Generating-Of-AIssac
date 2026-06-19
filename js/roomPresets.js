@@ -8,6 +8,7 @@ import {
 } from "./constants.js";
 import { createEmptyGrid, decodeRoomId, encodeRoomId } from "./roomId.js";
 import { applyRoomObjectVariants } from "./roomVariants.js";
+import { getActiveBossDefinition, getBossPresetIds, getBossRoomLayouts } from "./boss.js";
 
 function place(grid, x, y, code) {
   if (x >= 0 && x < ROOM_WIDTH && y >= 0 && y < ROOM_HEIGHT) {
@@ -516,19 +517,13 @@ const PRESET_LAYOUTS = {
   },
 
   boss_chamber: {
-    blood: [
-      [1, 0], [2, 0], [10, 0], [11, 0], [0, 1], [12, 1],
-      [1, 6], [11, 6], [0, 5], [12, 5], [2, 6], [10, 6],
-      [3, 1], [9, 1], [4, 5], [8, 5], [5, 0], [7, 6],
-      [2, 3], [10, 3], [6, 1], [6, 5], [3, 3], [9, 3],
-      [4, 2], [8, 4], [5, 2], [7, 4], [1, 4], [11, 2],
-      [2, 2], [10, 4], [4, 4], [8, 2], [6, 6], [6, 0],
-    ],
-    rocks: [[6, 3]],
-    poops: [[4, 3], [8, 3]],
+    rocks: [[4, 2], [8, 2], [4, 4], [8, 4]],
+    poops: [[3, 3], [9, 3]],
     redCampfires: [[0, 2], [12, 2], [2, 0], [10, 0]],
     skipPerimeter: true,
   },
+
+  ...getBossRoomLayouts(),
 };
 
 const LAYOUT_BUILDERS = Object.fromEntries(
@@ -538,10 +533,11 @@ const LAYOUT_BUILDERS = Object.fromEntries(
   ])
 );
 
-export const BOSS_PRESET = "boss_chamber";
+export const BOSS_PRESET = getActiveBossDefinition().presetId;
+const BOSS_PRESET_IDS = new Set(getBossPresetIds());
 
 export const ROOM_PRESET_POOL = Object.keys(LAYOUT_BUILDERS).filter(
-  (id) => id !== BOSS_PRESET
+  (id) => !BOSS_PRESET_IDS.has(id) && id !== "boss_chamber"
 );
 
 export const ROOM_PRESETS = Object.fromEntries(
@@ -551,8 +547,11 @@ export const ROOM_PRESETS = Object.fromEntries(
       id,
       {
         id,
-        name: id === BOSS_PRESET ? "Boss Chamber" : formatPresetName(id),
-        isBoss: id === BOSS_PRESET,
+        name:
+          id === BOSS_PRESET || BOSS_PRESET_IDS.has(id)
+            ? `${getActiveBossDefinition().name}'s Chamber`
+            : formatPresetName(id),
+        isBoss: id === BOSS_PRESET || BOSS_PRESET_IDS.has(id),
         buildGrid: buildLayoutFn,
         presetPickups: pickups,
         baseRoomId: encodeRoomId(grid, {

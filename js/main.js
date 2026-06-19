@@ -3,7 +3,7 @@ import { drawRoom, roomPixelSize, tickRoomAmbience } from "./render.js";
 import { getRoomScreenLayout, getSpawnPosition } from "./roomSpace.js";
 import { createInputState, bindInput, clearInputFrame } from "./input.js";
 import { AIsaac } from "./player.js";
-import { TearBurst, PoopSplatter, BombExplosion, BloodTearBurst, BossDeathBurst } from "./effects.js";
+import { TearBurst, PoopSplatter, BombExplosion, BloodTearBurst, BossDeathBurst, SmokePuff } from "./effects.js";
 import { tryPlaceBomb } from "./bomb.js";
 import { BOMB_PLACE_COOLDOWN, EXPLOSION_RADIUS_X, EXPLOSION_RADIUS_Y, BLOOD_TEAR_DAMAGE } from "./constants.js";
 import { resolveExplosionChain } from "./explosion.js";
@@ -46,6 +46,7 @@ import {
   drawBossIntro,
   drawFloorDescent,
 } from "./cinematic.js";
+import { addBloodSmearToRoom } from "./floorSmears.js";
 
 function syncRoomEntities(cell) {
   game.chest = cell?.chest ?? null;
@@ -55,6 +56,9 @@ function syncRoomEntities(cell) {
   game.enemies = cell?.enemies ?? [];
   game.boss = cell?.boss ?? null;
   game.trapdoor = cell?.trapdoor ?? null;
+  if (cell?.floorSmears && game.room) {
+    game.room.floorSmears = cell.floorSmears;
+  }
   syncRoomDoorLock(game.room, cell);
 }
 
@@ -264,49 +268,66 @@ function tryPlaceBombFromInput() {
   }
 }
 
+function spawnSmokePuff(x, y) {
+  game.bursts.push(new SmokePuff(x, y));
+}
+
+function spawnEnemyBloodSmear(x, y) {
+  addBloodSmearToRoom(game.room, currentCell(), x, y);
+}
+
 function triggerExplosion(x, y) {
   const cell = currentCell();
   const healthBefore = game.player.stats.health + game.player.stats.soulHealth;
 
-  const loot = resolveExplosionChain(game.room, x, y, game.bombs, game.player, (bx, by) => {
-    if (
-      tryBreakDoorsFromExplosion(
-        cell,
-        game.room,
-        bx,
-        by,
-        EXPLOSION_RADIUS_X,
-        EXPLOSION_RADIUS_Y,
-        (wall) => !isBossDoor(game.dungeon, game.gx, game.gy, wall)
-      )
-    ) {
-      sfx.doorBreak();
-    }
-    game.bursts.push(new BombExplosion(bx, by, EXPLOSION_RADIUS_X, EXPLOSION_RADIUS_Y));
-    sfx.explosion();
-    damageEnemiesInExplosion(
-      game.enemies,
-      bx,
-      by,
-      EXPLOSION_RADIUS_X,
-      EXPLOSION_RADIUS_Y,
-      EXPLOSION_DAMAGE
-    );
-    if (game.boss?.alive) {
-      damageBossInExplosion(
-        game.boss,
+  const { pickups, smokePoints } = resolveExplosionChain(
+    game.room,
+    x,
+    y,
+    game.bombs,
+    game.player,
+    (bx, by) => {
+      if (
+        tryBreakDoorsFromExplosion(
+          cell,
+          game.room,
+          bx,
+          by,
+          EXPLOSION_RADIUS_X,
+          EXPLOSION_RADIUS_Y,
+          (wall) => !isBossDoor(game.dungeon, game.gx, game.gy, wall)
+        )
+      ) {
+        sfx.doorBreak();
+      }
+      game.bursts.push(new BombExplosion(bx, by, EXPLOSION_RADIUS_X, EXPLOSION_RADIUS_Y));
+      sfx.explosion();
+      const kills = damageEnemiesInExplosion(
+        game.enemies,
         bx,
         by,
         EXPLOSION_RADIUS_X,
         EXPLOSION_RADIUS_Y,
         EXPLOSION_DAMAGE
       );
-      if (!game.boss.alive) onBossDeath(cell, game.boss);
-      else updateBossHud(game.boss);
+      for (const kill of kills) spawnEnemyBloodSmear(kill.x, kill.y);
+      if (game.boss?.alive) {
+        damageBossInExplosion(
+          game.boss,
+          bx,
+          by,
+          EXPLOSION_RADIUS_X,
+          EXPLOSION_RADIUS_Y,
+          EXPLOSION_DAMAGE
+        );
+        if (!game.boss.alive) onBossDeath(cell, game.boss);
+        else updateBossHud(game.boss);
+      }
     }
-  });
+  );
 
-  if (loot.length) game.pickups.push(...loot);
+  if (pickups.length) game.pickups.push(...pickups);
+  for (const point of smokePoints) spawnSmokePuff(point.x, point.y);
   if (cell) handleRoomClear(cell);
 
   const healthAfter = game.player.stats.health + game.player.stats.soulHealth;
@@ -518,8 +539,10 @@ function update(dt) {
     if (burstPos) {
       if (burstPos.enemy) {
         game.bursts.push(new TearBurst(burstPos.x, burstPos.y));
-        if (burstPos.killed) sfx.enemyDeath();
-        else sfx.enemyHit();
+        if (burstPos.killed) {
+          sfx.enemyDeath();
+          spawnEnemyBloodSmear(burstPos.x, burstPos.y);
+        } else sfx.enemyHit();
         handleRoomClear(currentCell());
       } else if (burstPos.boss) {
         game.bursts.push(new TearBurst(burstPos.x, burstPos.y));
@@ -534,8 +557,10 @@ function update(dt) {
         sfx.tearPoop();
       } else if (burstPos.campfire) {
         game.bursts.push(new TearBurst(burstPos.x, burstPos.y));
-        if (burstPos.extinguished) sfx.extinguish();
-        else sfx.tearCampfire();
+        if (burstPos.extinguished) {
+          sfx.extinguish();
+          spawnSmokePuff(burstPos.x, burstPos.y);
+        } else sfx.tearCampfire();
       } else if (burstPos.barrel) {
         game.bursts.push(new TearBurst(burstPos.x, burstPos.y));
         sfx.tearBarrel();
@@ -581,8 +606,9 @@ function onBossDeath(cell, boss) {
   sfx.bossDeath();
   refreshDoorLockState(cell, game.room);
   hideBossHud();
-  game.trapdoor = spawnTrapdoor(game.room);
+  game.trapdoor = spawnTrapdoor(game.room, game.player);
   cell.trapdoor = game.trapdoor;
+  spawnSmokePuff(game.trapdoor.x, game.trapdoor.y);
   persistRoomEntities(cell);
 }
 

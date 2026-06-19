@@ -22,8 +22,8 @@ import { spawnEnemiesInDungeon } from "./enemySpawner.js";
 import { createBrokenDoors, syncRoomDoorLock } from "./doorLock.js";
 import { initDestroyedPots } from "./pot.js";
 import { applyRoomObjectVariants } from "./roomVariants.js";
-import { createBoss } from "./boss.js";
-import { TILE_SIZE } from "./constants.js";
+import { createBoss, getActiveBossDefinition, getBossSpawnPosition } from "./boss.js";
+import { generateBossFloorSmears } from "./floorSmears.js";
 
 function mulberry32(seed) {
   return function rand() {
@@ -273,6 +273,7 @@ export function generateDungeon(seed = Date.now()) {
     built.destroyedPots = cell.destroyedPots;
     built.barrelStates = cell.barrelStates;
     built.campfireStates = cell.campfireStates;
+    built.floorSmears = cell.floorSmears ?? [];
     rooms[`${cell.gx},${cell.gy}`] = {
       ...cell,
       doors,
@@ -291,6 +292,7 @@ export function generateDungeon(seed = Date.now()) {
       brokenDoors: cell.brokenDoors ?? createBrokenDoors(),
       hadCombatEnemies: cell.hadCombatEnemies ?? false,
       clearRewardDropped: cell.clearRewardDropped ?? false,
+      floorSmears: cell.floorSmears ?? [],
     };
   }
 
@@ -308,11 +310,20 @@ export function generateDungeon(seed = Date.now()) {
   for (const cell of Object.values(dungeon.rooms)) {
     if (cell.isBoss) {
       cell.enemies = [];
+      const bossDef = getActiveBossDefinition();
       if (!cell.boss) {
-        cell.boss = createBoss(TILE_SIZE * 6.5, TILE_SIZE * 3.2);
+        const spawn = getBossSpawnPosition(bossDef);
+        cell.boss = createBoss(spawn.x, spawn.y);
+      }
+      if (!cell.floorSmears?.length) {
+        cell.floorSmears = generateBossFloorSmears(rand, bossDef.floorBloodCount);
+        cell.room.floorSmears = cell.floorSmears;
       }
       cell.bossIntroSeen = cell.bossIntroSeen ?? false;
       cell.bossDefeated = cell.bossDefeated ?? false;
+    } else if (!cell.floorSmears) {
+      cell.floorSmears = [];
+      cell.room.floorSmears = cell.floorSmears;
     }
     syncRoomDoorLock(cell.room, cell);
   }
