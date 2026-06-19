@@ -9,7 +9,7 @@ import { Pickup } from "./pickup.js";
 import { rollClearRoomLoot } from "./lootDrops.js";
 import { circleHitsRoom } from "./roomSpace.js";
 
-export const CLEAR_ROOM_DROP_CHANCE = 0.18;
+export const CLEAR_ROOM_DROP_CHANCE = 1 / 3;
 
 const CENTER_TX = Math.floor(ROOM_WIDTH / 2);
 const CENTER_TY = Math.floor(ROOM_HEIGHT / 2);

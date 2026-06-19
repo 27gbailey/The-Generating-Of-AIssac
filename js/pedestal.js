@@ -22,9 +22,8 @@ export class Pedestal {
     if (this.itemTaken) return null;
 
     const chest = player.chestPosition?.() ?? { x: player.x, y: player.y };
-    const itemY = this.y - 28;
-    const dist = Math.hypot(chest.x - this.x, chest.y - itemY);
-    if (dist < (player.bodyRadius ?? player.radius) + 16) {
+    const dist = Math.hypot(chest.x - this.x, chest.y - this.y);
+    if (dist < (player.bodyRadius ?? player.radius) + this.hitRadius) {
       this.itemTaken = true;
       return this.itemId;
     }

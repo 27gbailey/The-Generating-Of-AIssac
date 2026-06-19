@@ -25,7 +25,7 @@ export function syncRoomDoorLock(room, cell) {
   room.floorNumber = cell?.floorNumber ?? 1;
 }
 
-export function isDoorPassable(room, wall, cell = null, floorNumber = null) {
+export function isDoorPassable(room, wall, cell = null, floorNumber = null, keyCount = 0) {
   if (!room?.doors?.[wall]) return false;
   if (room.doorLock?.broken?.[wall]) return true;
 
@@ -33,14 +33,14 @@ export function isDoorPassable(room, wall, cell = null, floorNumber = null) {
   const goldenWall = cell?.goldenDoorWall ?? room.goldenDoorWall;
   const goldenOpened = cell?.goldenDoorOpened ?? room.goldenDoorOpened;
 
-  if (goldenWall === wall && floor >= 2 && !goldenOpened) return false;
   if (room.doorLock?.locked) return false;
+  if (goldenWall === wall && floor >= 2 && !goldenOpened) return keyCount > 0;
   return true;
 }
 
-export function isDoorBlocked(room, wall, cell = null, floorNumber = null) {
+export function isDoorBlocked(room, wall, cell = null, floorNumber = null, keyCount = 0) {
   if (!room?.doors?.[wall]) return true;
-  return !isDoorPassable(room, wall, cell, floorNumber);
+  return !isDoorPassable(room, wall, cell, floorNumber, keyCount);
 }
 
 export function tryBreakDoorsFromExplosion(cell, room, cx, cy, radiusX, radiusY, canBreakDoor) {

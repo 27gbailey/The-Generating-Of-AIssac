@@ -86,27 +86,27 @@ function circleIntersectsTile(cx, cy, radius, tx, ty) {
   return dx * dx + dy * dy < radius * radius;
 }
 
-export function circleHitsBoundary(cx, cy, radius, room) {
+export function circleHitsBoundary(cx, cy, radius, room, { keyCount = 0 } = {}) {
   const { width, height } = getPlayAreaSize();
 
   if (cx - radius < 0) {
-    if (isDoorBlocked(room, "west") || !isInDoorGap("west", cx, cy, width, height)) return true;
+    if (isDoorBlocked(room, "west", null, null, keyCount) || !isInDoorGap("west", cx, cy, width, height)) return true;
   }
   if (cx + radius > width) {
-    if (isDoorBlocked(room, "east") || !isInDoorGap("east", cx, cy, width, height)) return true;
+    if (isDoorBlocked(room, "east", null, null, keyCount) || !isInDoorGap("east", cx, cy, width, height)) return true;
   }
   if (cy - radius < 0) {
-    if (isDoorBlocked(room, "north") || !isInDoorGap("north", cx, cy, width, height)) return true;
+    if (isDoorBlocked(room, "north", null, null, keyCount) || !isInDoorGap("north", cx, cy, width, height)) return true;
   }
   if (cy + radius > height) {
-    if (isDoorBlocked(room, "south") || !isInDoorGap("south", cx, cy, width, height)) return true;
+    if (isDoorBlocked(room, "south", null, null, keyCount) || !isInDoorGap("south", cx, cy, width, height)) return true;
   }
 
   return false;
 }
 
-export function circleHitsRoom(cx, cy, radius, room, { flying = false } = {}) {
-  if (circleHitsBoundary(cx, cy, radius, room)) return true;
+export function circleHitsRoom(cx, cy, radius, room, { flying = false, keyCount = 0 } = {}) {
+  if (circleHitsBoundary(cx, cy, radius, room, { keyCount })) return true;
   if (flying) return false;
 
   const { width, height } = getPlayAreaSize();

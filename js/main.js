@@ -72,8 +72,7 @@ function syncRoomEntities(cell) {
   game.trapdoor = cell?.trapdoor ?? null;
   game.pedestal = cell?.pedestal ?? null;
   if (game.room) {
-    game.room.pedestal =
-      cell?.pedestal?.active && !cell.pedestal.itemTaken ? cell.pedestal : null;
+    game.room.pedestal = cell?.pedestal?.active ? cell.pedestal : null;
   }
   if (cell?.floorSmears && game.room) {
     game.room.floorSmears = cell.floorSmears;
@@ -132,7 +131,6 @@ function updatePedestal(dt) {
 
   const cell = currentCell();
   game.player.addItem(itemId);
-  if (game.room) game.room.pedestal = null;
   if (cell) cell.pedestal = pedestal;
 
   const item = getItem(itemId);
@@ -273,8 +271,7 @@ function boot() {
 
   syncRoomDoorLock(start.room, start);
   if (game.room) {
-    game.room.pedestal =
-      start.pedestal?.active && !start.pedestal.itemTaken ? start.pedestal : null;
+    game.room.pedestal = start.pedestal?.active ? start.pedestal : null;
   }
   updateHud();
 }

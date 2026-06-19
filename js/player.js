@@ -111,13 +111,13 @@ export class AIsaac {
       const nextX = this.x + this.vx * stepDt;
       const nextY = this.y + this.vy * stepDt;
 
-      if (!circleHitsRoom(nextX, this.y + chestY, r, room)) {
+      if (!circleHitsRoom(nextX, this.y + chestY, r, room, { keyCount: this.stats.keys })) {
         this.x = nextX;
       } else {
         this.vx = 0;
       }
 
-      if (!circleHitsRoom(this.x, nextY + chestY, r, room)) {
+      if (!circleHitsRoom(this.x, nextY + chestY, r, room, { keyCount: this.stats.keys })) {
         this.y = nextY;
       } else {
         this.vy = 0;

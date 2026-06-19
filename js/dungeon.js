@@ -73,29 +73,49 @@ function expandableDirections(cells, gx, gy, rand) {
   return options;
 }
 
-function pickExpansionCell(cells, rand) {
-  const occupied = Object.values(cells);
-  const deadEnds = occupied.filter((cell) => neighborCount(cells, cell.gx, cell.gy) === 1);
-  const branchPoints = occupied.filter((cell) => {
-    const count = neighborCount(cells, cell.gx, cell.gy);
-    return count >= 2 && count < 4 && expandableDirections(cells, cell.gx, cell.gy, rand).length > 0;
-  });
-
-  if (branchPoints.length > 0 && (deadEnds.length === 0 || rand() < 0.88)) {
-    branchPoints.sort(
-      (a, b) => neighborCount(cells, b.gx, b.gy) - neighborCount(cells, a.gx, a.gy)
-    );
-    const top = branchPoints.slice(0, Math.min(5, branchPoints.length));
-    return top[Math.floor(rand() * top.length)];
+function existingNeighborCount(cells, nx, ny) {
+  let count = 0;
+  for (const wall of DOOR_WALLS) {
+    const { dx, dy } = DIRECTIONS[wall];
+    if (cells[`${nx + dx},${ny + dy}`]) count++;
   }
-  if (deadEnds.length > 0 && rand() < 0.1) {
-    return deadEnds[Math.floor(rand() * deadEnds.length)];
-  }
-  if (branchPoints.length > 0) {
-    return branchPoints[Math.floor(rand() * branchPoints.length)];
-  }
-  return occupied[Math.floor(rand() * occupied.length)];
+  return count;
 }
+
+/** True when placing a room at (nx, ny) touches exactly one existing room. */
+function isLeafPlacement(cells, nx, ny) {
+  return existingNeighborCount(cells, nx, ny) === 1;
+}
+
+function pickBranchExpansion(cells, rand) {
+  const leaves = [];
+  const forks = [];
+
+  for (const cell of Object.values(cells)) {
+    if (cell.isItemRoom || cell.isSecret || cell.isBoss) continue;
+
+    const degree = neighborCount(cells, cell.gx, cell.gy);
+    const options = expandableDirections(cells, cell.gx, cell.gy, rand).filter((pick) =>
+      isLeafPlacement(cells, pick.nx, pick.ny)
+    );
+    if (!options.length) continue;
+
+    const entry = { cell, options };
+    if (degree <= 1) leaves.push(entry);
+    else if (degree === 2) forks.push(entry);
+  }
+
+  const pool =
+    leaves.length > 0 && (forks.length === 0 || rand() < 0.82)
+      ? leaves
+      : [...leaves, ...forks];
+  if (!pool.length) return null;
+
+  const chosen = pool[Math.floor(rand() * pool.length)];
+  const pick = chosen.options[Math.floor(rand() * chosen.options.length)];
+  return { parent: chosen.cell, ...pick };
+}
+
 
 function intendedNeighbors(cells, gx, gy) {
   const neighbors = {};
@@ -348,23 +368,6 @@ function isAdjacentToBoss(cells, nx, ny, bossKey) {
   return Math.abs(nx - boss.gx) + Math.abs(ny - boss.gy) === 1;
 }
 
-function countSurroundedSides(cells, parent, nx, ny) {
-  let surrounded = 0;
-  for (const wall of DOOR_WALLS) {
-    const { dx, dy } = DIRECTIONS[wall];
-    const sx = nx + dx;
-    const sy = ny + dy;
-    if (sx < 0 || sy < 0 || sx >= FLOOR_GRID_SIZE || sy >= FLOOR_GRID_SIZE) {
-      surrounded++;
-      continue;
-    }
-    const otherKey = `${sx},${sy}`;
-    if (otherKey === `${parent.gx},${parent.gy}`) continue;
-    if (cells[otherKey]) surrounded++;
-  }
-  return surrounded;
-}
-
 function placeItemRoom(cells, rand, excludeKeys, bossKey) {
   const candidates = branchCandidates(cells, excludeKeys, rand).filter(
     (c) => neighborCount(cells, c.gx, c.gy) >= 1
@@ -372,7 +375,9 @@ function placeItemRoom(cells, rand, excludeKeys, bossKey) {
 
   for (const parent of candidates) {
     const options = expandableDirections(cells, parent.gx, parent.gy, rand).filter(
-      (pick) => !isAdjacentToBoss(cells, pick.nx, pick.ny, bossKey)
+      (pick) =>
+        isLeafPlacement(cells, pick.nx, pick.ny) &&
+        !isAdjacentToBoss(cells, pick.nx, pick.ny, bossKey)
     );
     if (!options.length) continue;
     const pick = options[Math.floor(rand() * options.length)];
@@ -402,6 +407,7 @@ function forcePlaceItemRoom(cells, rand, excludeKeys, bossKey, startKey) {
     if (excludeKeys.has(parentKey) || parent.isBoss || parent.isSecret) continue;
     for (const pick of expandableDirections(cells, parent.gx, parent.gy, rand)) {
       if (excludeKeys.has(`${pick.nx},${pick.ny}`)) continue;
+      if (!isLeafPlacement(cells, pick.nx, pick.ny)) continue;
       if (isAdjacentToBoss(cells, pick.nx, pick.ny, bossKey)) continue;
       const newKey = `${pick.nx},${pick.ny}`;
       cells[newKey] = {
@@ -418,80 +424,159 @@ function forcePlaceItemRoom(cells, rand, excludeKeys, bossKey, startKey) {
     }
   }
 
-  const start = cells[startKey];
-  for (const pick of expandableDirections(cells, start.gx, start.gy, rand)) {
-    if (isAdjacentToBoss(cells, pick.nx, pick.ny, bossKey)) continue;
-    const newKey = `${pick.nx},${pick.ny}`;
-    cells[newKey] = {
-      gx: pick.nx,
-      gy: pick.ny,
-      isStart: false,
-      isItemRoom: true,
-      presetId: ITEM_ROOM_PRESET,
-    };
-    start.itemDoorWall = pick.wall;
-    start.goldenDoorWall = pick.wall;
-    start.goldenDoorOpened = false;
-    return newKey;
-  }
   return null;
 }
 
-function placeSecretRoom(cells, rand, excludeKeys, bossKey, minSurrounded = 3) {
-  const candidates = branchCandidates(cells, excludeKeys, rand);
+function wallFromTo(fx, fy, tx, ty) {
+  if (tx > fx) return "east";
+  if (tx < fx) return "west";
+  if (ty > fy) return "south";
+  if (ty < fy) return "north";
+  return null;
+}
 
-  for (const parent of candidates) {
-    const options = expandableDirections(cells, parent.gx, parent.gy, rand).filter(
-      (pick) => !isAdjacentToBoss(cells, pick.nx, pick.ny, bossKey)
-    );
-    for (const pick of options) {
-      if (countSurroundedSides(cells, parent, pick.nx, pick.ny) < minSurrounded) continue;
+function isValidSecretNeighbor(cell, key, excludeKeys) {
+  if (!cell || cell.isBoss || cell.isItemRoom || cell.isSecret) return false;
+  if (excludeKeys.has(key)) return false;
+  return true;
+}
 
-      const key = `${pick.nx},${pick.ny}`;
-      const presetId = SECRET_PRESET_POOL[Math.floor(rand() * SECRET_PRESET_POOL.length)];
-      cells[key] = {
-        gx: pick.nx,
-        gy: pick.ny,
-        isStart: false,
-        isSecret: true,
-        secretRevealed: false,
-        presetId,
-      };
-      parent.secretLink = { gx: pick.nx, gy: pick.ny, wall: pick.wall };
-      return key;
+/** Sides with no adjacent room (empty grid or out of bounds). */
+function countOpenSides(cells, gx, gy) {
+  let open = 0;
+  for (const wall of DOOR_WALLS) {
+    const { dx, dy } = DIRECTIONS[wall];
+    const nx = gx + dx;
+    const ny = gy + dy;
+    if (nx < 0 || ny < 0 || nx >= FLOOR_GRID_SIZE || ny >= FLOOR_GRID_SIZE) {
+      open++;
+      continue;
     }
+    if (!cells[`${nx},${ny}`]) open++;
+  }
+  return open;
+}
+
+/**
+ * Empty pocket bordered by three normal rooms; the fourth side stays empty.
+ * Each neighbor gets a secretLink so any of the three walls can be bombed open.
+ */
+function findSecretPocketSites(cells, excludeKeys, bossKey) {
+  const sites = [];
+
+  for (let gy = 0; gy < FLOOR_GRID_SIZE; gy++) {
+    for (let gx = 0; gx < FLOOR_GRID_SIZE; gx++) {
+      const key = `${gx},${gy}`;
+      if (cells[key] || excludeKeys.has(key)) continue;
+      if (isAdjacentToBoss(cells, gx, gy, bossKey)) continue;
+      if (existingNeighborCount(cells, gx, gy) !== 3) continue;
+      if (countOpenSides(cells, gx, gy) !== 1) continue;
+
+      const parents = [];
+      for (const wall of DOOR_WALLS) {
+        const { dx, dy } = DIRECTIONS[wall];
+        const nk = `${gx + dx},${gy + dy}`;
+        const neighbor = cells[nk];
+        if (!isValidSecretNeighbor(neighbor, nk, excludeKeys)) continue;
+        parents.push({ parent: neighbor, wall });
+      }
+      if (parents.length !== 3) continue;
+      sites.push({ gx, gy, parents });
+    }
+  }
+
+  return sites;
+}
+
+function linkSecretEntrances(site, secretGx, secretGy) {
+  for (const entry of site.parents) {
+    entry.parent.secretLink = { gx: secretGx, gy: secretGy, wall: entry.wall };
+  }
+}
+
+function addSecretAtSite(cells, rand, site) {
+  const key = `${site.gx},${site.gy}`;
+  const presetId = SECRET_PRESET_POOL[Math.floor(rand() * SECRET_PRESET_POOL.length)];
+  cells[key] = {
+    gx: site.gx,
+    gy: site.gy,
+    isStart: false,
+    isSecret: true,
+    secretRevealed: false,
+    presetId,
+  };
+  linkSecretEntrances(site, site.gx, site.gy);
+  return key;
+}
+
+/** Carve a pocket: add one room on an open side so three sides have rooms and one stays empty. */
+function tryCarveSecretPocket(cells, rand, excludeKeys, bossKey) {
+  const candidates = [];
+
+  for (let gy = 0; gy < FLOOR_GRID_SIZE; gy++) {
+    for (let gx = 0; gx < FLOOR_GRID_SIZE; gx++) {
+      const key = `${gx},${gy}`;
+      if (cells[key] || excludeKeys.has(key)) continue;
+      if (isAdjacentToBoss(cells, gx, gy, bossKey)) continue;
+      if (existingNeighborCount(cells, gx, gy) !== 2) continue;
+      if (countOpenSides(cells, gx, gy) !== 2) continue;
+
+      const neighborEntries = [];
+      const openWalls = [];
+      for (const wall of DOOR_WALLS) {
+        const { dx, dy } = DIRECTIONS[wall];
+        const nx = gx + dx;
+        const ny = gy + dy;
+        if (nx < 0 || ny < 0 || nx >= FLOOR_GRID_SIZE || ny >= FLOOR_GRID_SIZE) continue;
+        const nk = `${nx},${ny}`;
+        const neighbor = cells[nk];
+        if (neighbor) {
+          if (!isValidSecretNeighbor(neighbor, nk, excludeKeys)) continue;
+          neighborEntries.push({ parent: neighbor, wall });
+        } else if (!excludeKeys.has(nk) && !isAdjacentToBoss(cells, nx, ny, bossKey)) {
+          openWalls.push({ wall, nx, ny });
+        }
+      }
+
+      if (neighborEntries.length !== 2 || openWalls.length < 1) continue;
+      candidates.push({ gx, gy, neighborEntries, openWalls });
+    }
+  }
+
+  if (!candidates.length) return null;
+
+  const site = candidates[Math.floor(rand() * candidates.length)];
+  const filler = site.openWalls[0];
+  cells[`${filler.nx},${filler.ny}`] = { gx: filler.nx, gy: filler.ny, isStart: false };
+
+  const fillerWall = wallFromTo(filler.nx, filler.ny, site.gx, site.gy);
+  const parents = [...site.neighborEntries, { parent: cells[`${filler.nx},${filler.ny}`], wall: fillerWall }];
+
+  const presetId = SECRET_PRESET_POOL[Math.floor(rand() * SECRET_PRESET_POOL.length)];
+  cells[`${site.gx},${site.gy}`] = {
+    gx: site.gx,
+    gy: site.gy,
+    isStart: false,
+    isSecret: true,
+    secretRevealed: false,
+    presetId,
+  };
+  linkSecretEntrances({ parents }, site.gx, site.gy);
+  return `${site.gx},${site.gy}`;
+}
+
+function placeSecretRoom(cells, rand, excludeKeys, bossKey) {
+  const sites = shuffle(findSecretPocketSites(cells, excludeKeys, bossKey), rand);
+  for (const site of sites) {
+    return addSecretAtSite(cells, rand, site);
   }
   return null;
 }
 
 function forcePlaceSecretRoom(cells, rand, excludeKeys, bossKey) {
-  for (const minSurrounded of [3, 2, 1]) {
-    const key = placeSecretRoom(cells, rand, excludeKeys, bossKey, minSurrounded);
-    if (key) return key;
-  }
-
-  const tryParents = shuffle(Object.values(cells), rand);
-  for (const parent of tryParents) {
-    const parentKey = `${parent.gx},${parent.gy}`;
-    if (excludeKeys.has(parentKey) || parent.isBoss || parent.isItemRoom) continue;
-    for (const pick of expandableDirections(cells, parent.gx, parent.gy, rand)) {
-      if (excludeKeys.has(`${pick.nx},${pick.ny}`)) continue;
-      if (isAdjacentToBoss(cells, pick.nx, pick.ny, bossKey)) continue;
-      const key = `${pick.nx},${pick.ny}`;
-      const presetId = SECRET_PRESET_POOL[Math.floor(rand() * SECRET_PRESET_POOL.length)];
-      cells[key] = {
-        gx: pick.nx,
-        gy: pick.ny,
-        isStart: false,
-        isSecret: true,
-        secretRevealed: false,
-        presetId,
-      };
-      parent.secretLink = { gx: pick.nx, gy: pick.ny, wall: pick.wall };
-      return key;
-    }
-  }
-  return null;
+  const key = placeSecretRoom(cells, rand, excludeKeys, bossKey);
+  if (key) return key;
+  return tryCarveSecretPocket(cells, rand, excludeKeys, bossKey);
 }
 
 function ensureBossEntrance(cells, bossKey, rand) {
@@ -519,6 +604,12 @@ function validateFloorGraph(cells, startKey, bossKey, itemKey, secretKey) {
   const neighbor = cells[bossNeighbors[0]];
   if (!neighbor || !bossSupportsEntrance(boss, neighbor)) return false;
 
+  const itemCell = cells[itemKey];
+  const secretCell = cells[secretKey];
+  if (neighborCount(cells, itemCell.gx, itemCell.gy) !== 1) return false;
+  if (neighborCount(cells, secretCell.gx, secretCell.gy) !== 3) return false;
+  if (countOpenSides(cells, secretCell.gx, secretCell.gy) !== 1) return false;
+
   return true;
 }
 
@@ -531,11 +622,13 @@ function buildCellGraph(rand, startX, startY) {
   let attempts = 0;
   while (Object.keys(cells).length < targetRooms && attempts < 600) {
     attempts++;
-    const cell = pickExpansionCell(cells, rand);
-    const options = expandableDirections(cells, cell.gx, cell.gy, rand);
-    if (options.length === 0) continue;
-    const pick = options[Math.floor(rand() * options.length)];
-    cells[`${pick.nx},${pick.ny}`] = { gx: pick.nx, gy: pick.ny, isStart: false };
+    const expansion = pickBranchExpansion(cells, rand);
+    if (!expansion) break;
+    cells[`${expansion.nx},${expansion.ny}`] = {
+      gx: expansion.nx,
+      gy: expansion.ny,
+      isStart: false,
+    };
   }
 
   let bossCell = pickBossCell(cells, startX, startY);
@@ -728,7 +821,7 @@ export function checkDoorTransition(player, room, gx, gy, dungeon) {
 
   for (const check of checks) {
     if (!room.doors[check.wall] || !check.test) continue;
-    if (!isDoorPassable(room, check.wall, cell, floorNumber)) continue;
+    if (!isDoorPassable(room, check.wall, cell, floorNumber, player.stats.keys)) continue;
     if (!isInDoorGap(check.wall, chest.x, cy, width, height)) continue;
 
     const next = getCurrentRoomData(dungeon, check.nx, check.ny);
